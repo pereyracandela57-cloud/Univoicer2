@@ -2853,7 +2853,7 @@
           universeNode.name = cleanName;
           universeNode.cover = nextCover || '';
           if (linkedUniverseNames.length) {
-            const parentUniverseIds = linkedUniverseNames
+            const selectedParentUniverseIds = linkedUniverseNames
               .map((linkedName) => state.universeNodes.find((node) =>
                 node.id !== universeNode.id
                 && String(node.kind || 'universe') === 'universe'
@@ -2862,7 +2862,20 @@
               .filter(Boolean)
               .map((node) => node.id)
               .filter((parentId) => parentId !== universeNode.id);
-            const primaryParentId = parentUniverseIds[0] || '';
+            const existingParentUniverseIds = getParentUniverseIdsForNode(universeNode)
+              .filter((parentId) => parentId !== universeNode.id);
+            const parentUniverseIds = [...new Set([
+              ...existingParentUniverseIds,
+              ...selectedParentUniverseIds
+            ])];
+            const currentPrimaryParentId = String(state.universeMemberships[universeNode.id] || universeNode.parentUniverseId || '').trim();
+            const preferredPrimaryParentId = selectedParentUniverseIds[0] || '';
+            const primaryParentId = (
+              (currentPrimaryParentId && parentUniverseIds.includes(currentPrimaryParentId) && currentPrimaryParentId)
+              || (preferredPrimaryParentId && parentUniverseIds.includes(preferredPrimaryParentId) && preferredPrimaryParentId)
+              || parentUniverseIds[0]
+              || ''
+            );
             if (primaryParentId) {
               state.universeMemberships[universeNode.id] = primaryParentId;
               universeNode.kind = 'world';
