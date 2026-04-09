@@ -1474,150 +1474,56 @@
       return `M ${Math.round(startX)} ${Math.round(startY)} C ${Math.round(control1X)} ${Math.round(control1Y)} ${Math.round(control2X)} ${Math.round(control2Y)} ${Math.round(endX)} ${Math.round(endY)}`;
     }
 
-    function renderMapView() {
-      const universes = groupByUniverse();
-      ensureUniverseNodes();
-      const worldNodes = [];
-      const worldLinks = [];
-      const childUniverseIds = new Set(Object.keys(state.universeMemberships || {}));
-      const rootUniverseNodes = state.universeNodes.filter(node => !childUniverseIds.has(node.id));
-      const absorptionEffect = state.mapAbsorptionEffect;
-      const absorptionMarkup = absorptionEffect
-        ? `
-            <div
-              class="absorption-effect"
-              style="--start-x:${Math.round(absorptionEffect.startX)}px; --start-y:${Math.round(absorptionEffect.startY)}px; --delta-x:${Math.round(absorptionEffect.deltaX)}px; --delta-y:${Math.round(absorptionEffect.deltaY)}px; --path-length:${Math.round(absorptionEffect.pathLength)}px; --angle:${absorptionEffect.angleDeg.toFixed(2)}deg;"
-              aria-hidden="true"
-            ></div>
-          `
-        : '';
-      const nodesMarkup = rootUniverseNodes.map(node => {
-        const universeData = universes[normalizeUniverseName(node.name)] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
-        const isExpanded = state.expandedUniverses.has(node.id);
-        if (isExpanded) {
-          const entries = getUniverseWorldEntries(node.name)
-            .map((entry) => ({ ...entry, type: 'universe-child', worldKey: `universe-child:${entry.id || normalizeUniverseName(entry.name)}` }));
-          const worldCount = entries.length;
-          const orbitRadius = getWorldOrbitRadius(worldCount);
-          const startAngle = ((Math.abs(hashCode(`${node.id}-${worldCount}`)) % 360) * Math.PI) / 180;
-          entries.forEach((entry, index) => {
-            const angle = startAngle + ((Math.PI * 2 * index) / Math.max(1, worldCount));
-            const worldX = Math.round(node.x + Math.cos(angle) * orbitRadius);
-            const worldY = Math.round(node.y + Math.sin(angle) * orbitRadius);
-            const safeX = Math.round(worldX - WORLD_NODE_HALF_WIDTH);
-            const safeY = Math.round(worldY - WORLD_NODE_HALF_HEIGHT);
-            const safeWorldName = escapeHtml(entry.name);
-            const floatDelay = ((Math.abs(hashCode(`${entry.id || entry.name}-${index}`)) % 24) / 10).toFixed(1);
-            const worldCenterX = worldX;
-            const worldCenterY = worldY;
-            const baseDx = Math.round(worldCenterX - node.x);
-            const baseDy = Math.round(worldCenterY - node.y);
-            const connectorVariant = getConnectorVariant(`${node.id}:${entry.worldKey}`);
-            const connectorPath = buildConnectorPath(node.x, node.y, worldCenterX, worldCenterY, angle, connectorVariant);
-            worldLinks.push(`
-              <path
-                class="map-link-path"
-                data-parent-id="${node.id}"
-                data-world-key="${entry.worldKey}"
-                data-base-angle="${angle.toFixed(4)}"
-                data-curve-strength="${connectorVariant.curveStrength}"
-                data-arc-bias="${connectorVariant.arcBias}"
-                data-twist-direction="${connectorVariant.twistDirection}"
-                data-sway="${connectorVariant.sway}"
-                style="--link-width:${connectorVariant.width}; --dash-pattern:${connectorVariant.dashPattern};"
-                d="${connectorPath}"
-              ></path>
-            `);
-            const childNode = state.universeNodes.find((item) => item.id === entry.id);
-            const parentUniverseIds = getParentUniverseIdsForNode(childNode);
-            const secondaryParentIds = parentUniverseIds.filter((parentId) => parentId !== node.id);
-            secondaryParentIds.forEach((secondaryParentId, secondaryIndex) => {
-              const secondaryParent = state.universeNodes.find((item) => item.id === secondaryParentId);
-              if (!secondaryParent) return;
-              const bridgeAngle = Math.atan2(secondaryParent.y - worldCenterY, secondaryParent.x - worldCenterX);
-              const bridgeVariant = getConnectorVariant(`${entry.worldKey}:${secondaryParentId}:${secondaryIndex}`);
-              const bridgePath = buildConnectorPath(worldCenterX, worldCenterY, secondaryParent.x, secondaryParent.y, bridgeAngle, {
-                ...bridgeVariant,
-                curveStrength: Math.max(0.12, bridgeVariant.curveStrength * 0.75),
-                arcBias: Math.max(0.16, bridgeVariant.arcBias * 0.7),
-                sway: Math.max(2, Math.round(bridgeVariant.sway * 0.5))
-              });
-              worldLinks.push(`
-                <path
-                  class="map-link-path map-link-path--secondary"
-                  data-parent-id="${node.id}"
-                  data-world-key="${entry.worldKey}:secondary:${secondaryParentId}"
-                  d="${bridgePath}"
-                ></path>
-              `);
-            });
-            worldNodes.push(`
-              <button
-                class="universe-node universe-node--world"
-                data-world-name="${safeWorldName}"
-                data-world-type="${entry.type}"
-                data-world-key="${entry.worldKey}"
-                data-parent-id="${node.id}"
-                data-base-angle="${angle.toFixed(4)}"
-                data-base-dx="${baseDx}"
-                data-base-dy="${baseDy}"
-                data-locked="${entry.unlocked ? '0' : '1'}"
-                style="left:${safeX}px; top:${safeY}px; --float-delay:-${floatDelay}s;"
-              >
-                <div class="orb-container">
-                  <img class="universe-cover" src="${getSafeUniverseCover(entry.name, entry.cover)}" alt="Portada de ${safeWorldName}" loading="lazy">
-                  <span class="cover-fallback">Sin portada</span>
-                </div>
-                <div class="node-info">
-                  <h3>${safeWorldName}</h3>
-                </div>
-              </button>
-            `);
-          });
-        }
-        const floatDelay = ((Math.abs(hashCode(node.id)) % 24) / 10).toFixed(1);
-        const safeName = escapeHtml(node.name);
-        return `
-          <button class="universe-node universe-node--universe" data-node-id="${node.id}" data-open="${safeName}" style="left:${node.x - NODE_HALF_WIDTH}px; top:${node.y - NODE_HALF_HEIGHT}px; --float-delay:-${floatDelay}s;">
-            <div class="orb-container">
-              <img class="universe-cover" src="${getSafeUniverseCover(node.name, node.cover)}" alt="Portada de ${safeName}" loading="lazy">
-              <span class="cover-fallback">Sin portada</span>
+    const mapViewRuntime = {
+      handlersBound: false,
+      dragState: {
+        activeNodeId: '',
+        targetNodeId: '',
+        pointerId: null,
+        offsetX: 0,
+        offsetY: 0,
+        startClientX: 0,
+        startClientY: 0,
+        moved: false,
+        activeNodeElement: null
+      }
+    };
+
+    function renderMapView(options = {}) {
+      const {
+        rebuildWorld = true
+      } = options;
+
+      const ensureMapStructure = () => {
+        if (viewMap.querySelector('#universeMapCanvas')) return;
+        viewMap.innerHTML = `
+          <div class="universe-map-shell">
+            <div class="map-toolbar">
+              <button type="button" id="undoAllAbsorptions" class="neon-btn map-reset-btn" aria-label="Explosión Big Bang">💥 Explosión Big Bang</button>
             </div>
-            <div class="node-info">
-              <h3>${safeName}</h3>
+            <div id="universeMapCanvas" aria-label="Mapa de universos explorable">
+              <div class="map-nebula-layer" aria-hidden="true"></div>
+              <div class="map-stars-layer" aria-hidden="true"></div>
+              <div class="map-world" id="mapWorld"></div>
             </div>
-          </button>
+          </div>
         `;
-      }).join('');
-      viewMap.innerHTML = `
-        <div class="universe-map-shell">
-          <div class="map-toolbar">
-            <button type="button" id="undoAllAbsorptions" class="neon-btn map-reset-btn" aria-label="Explosión Big Bang">💥 Explosión Big Bang</button>
-          </div>
-          <div id="universeMapCanvas" aria-label="Mapa de universos explorable">
-            <div class="map-nebula-layer" aria-hidden="true"></div>
-            <div class="map-stars-layer" aria-hidden="true"></div>
-            <div class="map-world" id="mapWorld">
-              <svg class="map-links-layer" id="mapLinksLayer" viewBox="0 0 ${state.mapCanvas.width} ${state.mapCanvas.height}" preserveAspectRatio="none" aria-hidden="true">
-                ${worldLinks.join('')}
-              </svg>
-              ${absorptionMarkup}
-              ${worldNodes.join('')}
-              ${nodesMarkup}
-            </div>
-          </div>
-        </section>
-      `;
+      };
+
+      ensureMapStructure();
 
       const mapCanvas = document.getElementById('universeMapCanvas');
       const mapWorld = document.getElementById('mapWorld');
       if (!mapCanvas || !mapWorld) return;
-
       const mapShell = viewMap.querySelector('.universe-map-shell');
+      if (!mapShell) return;
 
       const MIN_MAP_ZOOM = 0.25;
       const MAX_MAP_ZOOM = 2.0;
       const WHEEL_ZOOM_FACTOR = 1.1;
+      const DRAG_OPEN_THRESHOLD = 8;
+      const DROP_TARGET_PROXIMITY = 190;
+
       const syncMapZoomDisplay = (scaleValue) => {
         const percentage = `${Math.round(scaleValue * 100)}%`;
         const zoomPercentEl = viewMap.querySelector('[data-map-zoom-percent], #mapZoomPercent');
@@ -1632,7 +1538,6 @@
       };
 
       const applyMapScale = (nextScale, focalPoint) => {
-        if (!mapShell) return;
         const safeScale = Math.max(MIN_MAP_ZOOM, Math.min(MAX_MAP_ZOOM, Number((nextScale || 1).toFixed(3))));
         state.mapViewport.scale = safeScale;
         mapWorld.style.transformOrigin = '0 0';
@@ -1656,7 +1561,6 @@
       };
 
       const syncMapCanvasSize = () => {
-        if (!mapShell) return;
         recalculateMapCanvasSize(mapShell.clientWidth, mapShell.clientHeight);
         mapCanvas.style.width = `${state.mapCanvas.width}px`;
         mapCanvas.style.height = `${state.mapCanvas.height}px`;
@@ -1679,7 +1583,222 @@
         const centroid = getUniverseCentroid();
         applyMapScale(scale, centroid);
       };
-      syncMapCanvasSize();
+
+      const toWorldPoint = (event) => {
+        const rect = mapCanvas.getBoundingClientRect();
+        const scale = state.mapViewport.scale || 1;
+        return {
+          x: (event.clientX - rect.left + mapShell.scrollLeft) / scale,
+          y: (event.clientY - rect.top + mapShell.scrollTop) / scale
+        };
+      };
+
+      const resetDragState = () => {
+        mapViewRuntime.dragState.activeNodeId = '';
+        mapViewRuntime.dragState.targetNodeId = '';
+        mapViewRuntime.dragState.pointerId = null;
+        mapViewRuntime.dragState.offsetX = 0;
+        mapViewRuntime.dragState.offsetY = 0;
+        mapViewRuntime.dragState.startClientX = 0;
+        mapViewRuntime.dragState.startClientY = 0;
+        mapViewRuntime.dragState.moved = false;
+        mapViewRuntime.dragState.activeNodeElement = null;
+      };
+
+      const updateDragTargetHighlight = (activeNodeId = '', targetNodeId = '') => {
+        viewMap.querySelectorAll('.universe-node').forEach((nodeEl) => {
+          const nodeId = nodeEl.dataset.nodeId || '';
+          nodeEl.classList.toggle('is-dragging', Boolean(activeNodeId) && nodeId === activeNodeId);
+          nodeEl.classList.toggle('is-drop-target', Boolean(targetNodeId) && nodeId === targetNodeId);
+        });
+      };
+
+      const updateConnectorPath = (pathEl, startX, startY, endX, endY, angle) => {
+        if (!pathEl) return;
+        const curveStrength = Number.parseFloat(pathEl.dataset.curveStrength || '');
+        const arcBias = Number.parseFloat(pathEl.dataset.arcBias || '');
+        const twistDirection = Number.parseInt(pathEl.dataset.twistDirection || '1', 10);
+        const sway = Number.parseFloat(pathEl.dataset.sway || '');
+        const path = buildConnectorPath(startX, startY, endX, endY, angle, {
+          curveStrength: Number.isFinite(curveStrength) ? curveStrength : 0.22,
+          arcBias: Number.isFinite(arcBias) ? arcBias : 0.3,
+          twistDirection: twistDirection === -1 ? -1 : 1,
+          sway: Number.isFinite(sway) ? sway : 0
+        });
+        pathEl.setAttribute('d', path);
+      };
+
+      const updateExpandedWorldsForParent = (parentNodeId) => {
+        if (!parentNodeId || !state.expandedUniverses.has(parentNodeId)) return;
+        const parentNode = state.universeNodes.find((item) => item.id === parentNodeId);
+        if (!parentNode) return;
+        const worldEls = [...viewMap.querySelectorAll(`.universe-node--world[data-parent-id="${parentNodeId}"]`)];
+        worldEls.forEach((worldEl) => {
+          const baseAngle = Number.parseFloat(worldEl.dataset.baseAngle || '0');
+          const baseDx = Number.parseFloat(worldEl.dataset.baseDx || '');
+          const baseDy = Number.parseFloat(worldEl.dataset.baseDy || '');
+          if (!Number.isFinite(baseAngle)) return;
+          const fallbackWorldRectX = Number.parseFloat(worldEl.style.left || '0');
+          const fallbackWorldRectY = Number.parseFloat(worldEl.style.top || '0');
+          const dx = Number.isFinite(baseDx) ? baseDx : (fallbackWorldRectX + WORLD_NODE_HALF_WIDTH - parentNode.x);
+          const dy = Number.isFinite(baseDy) ? baseDy : (fallbackWorldRectY + WORLD_NODE_HALF_HEIGHT - parentNode.y);
+          const targetCenterX = parentNode.x + dx;
+          const targetCenterY = parentNode.y + dy;
+          worldEl.dataset.baseDx = `${Math.round(dx)}`;
+          worldEl.dataset.baseDy = `${Math.round(dy)}`;
+          worldEl.style.left = `${Math.round(targetCenterX - WORLD_NODE_HALF_WIDTH)}px`;
+          worldEl.style.top = `${Math.round(targetCenterY - WORLD_NODE_HALF_HEIGHT)}px`;
+          const worldKey = worldEl.dataset.worldKey || '';
+          const pathEl = viewMap.querySelector(`.map-link-path[data-parent-id="${parentNodeId}"][data-world-key="${worldKey}"]`);
+          updateConnectorPath(pathEl, parentNode.x, parentNode.y, targetCenterX, targetCenterY, baseAngle);
+        });
+      };
+
+      const findDropTargetForNode = (activeNode) => {
+        if (!activeNode) return null;
+        let best = null;
+        state.universeNodes.forEach((candidateNode) => {
+          if (!candidateNode || candidateNode.id === activeNode.id) return;
+          const dx = candidateNode.x - activeNode.x;
+          const dy = candidateNode.y - activeNode.y;
+          const distance = Math.hypot(dx, dy);
+          const isColliding = Math.abs(dx) <= NODE_HALF_WIDTH && Math.abs(dy) <= NODE_HALF_HEIGHT;
+          const isNear = distance <= DROP_TARGET_PROXIMITY;
+          if (!isColliding && !isNear) return;
+          const score = (isColliding ? 0 : 1) * 1000 + distance;
+          if (!best || score < best.score) {
+            best = { node: candidateNode, score };
+          }
+        });
+        return best?.node || null;
+      };
+
+      const renderMapWorldContent = () => {
+        const universes = groupByUniverse();
+        ensureUniverseNodes();
+        const worldNodes = [];
+        const worldLinks = [];
+        const childUniverseIds = new Set(Object.keys(state.universeMemberships || {}));
+        const rootUniverseNodes = state.universeNodes.filter(node => !childUniverseIds.has(node.id));
+        const absorptionEffect = state.mapAbsorptionEffect;
+        const absorptionMarkup = absorptionEffect
+          ? `
+              <div
+                class="absorption-effect"
+                style="--start-x:${Math.round(absorptionEffect.startX)}px; --start-y:${Math.round(absorptionEffect.startY)}px; --delta-x:${Math.round(absorptionEffect.deltaX)}px; --delta-y:${Math.round(absorptionEffect.deltaY)}px; --path-length:${Math.round(absorptionEffect.pathLength)}px; --angle:${absorptionEffect.angleDeg.toFixed(2)}deg;"
+                aria-hidden="true"
+              ></div>
+            `
+          : '';
+        const nodesMarkup = rootUniverseNodes.map(node => {
+          const universeData = universes[normalizeUniverseName(node.name)] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
+          const isExpanded = state.expandedUniverses.has(node.id);
+          if (isExpanded) {
+            const entries = getUniverseWorldEntries(node.name)
+              .map((entry) => ({ ...entry, type: 'universe-child', worldKey: `universe-child:${entry.id || normalizeUniverseName(entry.name)}` }));
+            const worldCount = entries.length;
+            const orbitRadius = getWorldOrbitRadius(worldCount);
+            const startAngle = ((Math.abs(hashCode(`${node.id}-${worldCount}`)) % 360) * Math.PI) / 180;
+            entries.forEach((entry, index) => {
+              const angle = startAngle + ((Math.PI * 2 * index) / Math.max(1, worldCount));
+              const worldX = Math.round(node.x + Math.cos(angle) * orbitRadius);
+              const worldY = Math.round(node.y + Math.sin(angle) * orbitRadius);
+              const safeX = Math.round(worldX - WORLD_NODE_HALF_WIDTH);
+              const safeY = Math.round(worldY - WORLD_NODE_HALF_HEIGHT);
+              const safeWorldName = escapeHtml(entry.name);
+              const floatDelay = ((Math.abs(hashCode(`${entry.id || entry.name}-${index}`)) % 24) / 10).toFixed(1);
+              const worldCenterX = worldX;
+              const worldCenterY = worldY;
+              const baseDx = Math.round(worldCenterX - node.x);
+              const baseDy = Math.round(worldCenterY - node.y);
+              const connectorVariant = getConnectorVariant(`${node.id}:${entry.worldKey}`);
+              const connectorPath = buildConnectorPath(node.x, node.y, worldCenterX, worldCenterY, angle, connectorVariant);
+              worldLinks.push(`
+                <path
+                  class="map-link-path"
+                  data-parent-id="${node.id}"
+                  data-world-key="${entry.worldKey}"
+                  data-base-angle="${angle.toFixed(4)}"
+                  data-curve-strength="${connectorVariant.curveStrength}"
+                  data-arc-bias="${connectorVariant.arcBias}"
+                  data-twist-direction="${connectorVariant.twistDirection}"
+                  data-sway="${connectorVariant.sway}"
+                  style="--link-width:${connectorVariant.width}; --dash-pattern:${connectorVariant.dashPattern};"
+                  d="${connectorPath}"
+                ></path>
+              `);
+              const childNode = state.universeNodes.find((item) => item.id === entry.id);
+              const parentUniverseIds = getParentUniverseIdsForNode(childNode);
+              const secondaryParentIds = parentUniverseIds.filter((parentId) => parentId !== node.id);
+              secondaryParentIds.forEach((secondaryParentId, secondaryIndex) => {
+                const secondaryParent = state.universeNodes.find((item) => item.id === secondaryParentId);
+                if (!secondaryParent) return;
+                const bridgeAngle = Math.atan2(secondaryParent.y - worldCenterY, secondaryParent.x - worldCenterX);
+                const bridgeVariant = getConnectorVariant(`${entry.worldKey}:${secondaryParentId}:${secondaryIndex}`);
+                const bridgePath = buildConnectorPath(worldCenterX, worldCenterY, secondaryParent.x, secondaryParent.y, bridgeAngle, {
+                  ...bridgeVariant,
+                  curveStrength: Math.max(0.12, bridgeVariant.curveStrength * 0.75),
+                  arcBias: Math.max(0.16, bridgeVariant.arcBias * 0.7),
+                  sway: Math.max(2, Math.round(bridgeVariant.sway * 0.5))
+                });
+                worldLinks.push(`
+                  <path
+                    class="map-link-path map-link-path--secondary"
+                    data-parent-id="${node.id}"
+                    data-world-key="${entry.worldKey}:secondary:${secondaryParentId}"
+                    d="${bridgePath}"
+                  ></path>
+                `);
+              });
+              worldNodes.push(`
+                <button
+                  class="universe-node universe-node--world"
+                  data-world-name="${safeWorldName}"
+                  data-world-type="${entry.type}"
+                  data-world-key="${entry.worldKey}"
+                  data-parent-id="${node.id}"
+                  data-base-angle="${angle.toFixed(4)}"
+                  data-base-dx="${baseDx}"
+                  data-base-dy="${baseDy}"
+                  data-locked="${entry.unlocked ? '0' : '1'}"
+                  style="left:${safeX}px; top:${safeY}px; --float-delay:-${floatDelay}s;"
+                >
+                  <div class="orb-container">
+                    <img class="universe-cover" src="${getSafeUniverseCover(entry.name, entry.cover)}" alt="Portada de ${safeWorldName}" loading="lazy">
+                    <span class="cover-fallback">Sin portada</span>
+                  </div>
+                  <div class="node-info">
+                    <h3>${safeWorldName}</h3>
+                  </div>
+                </button>
+              `);
+            });
+          }
+          const floatDelay = ((Math.abs(hashCode(node.id)) % 24) / 10).toFixed(1);
+          const safeName = escapeHtml(node.name);
+          const stateClass = universeData.state || 'incomplete';
+          return `
+            <button class="universe-node universe-node--universe universe-node--${stateClass}" data-node-id="${node.id}" data-open="${safeName}" style="left:${node.x - NODE_HALF_WIDTH}px; top:${node.y - NODE_HALF_HEIGHT}px; --float-delay:-${floatDelay}s;">
+              <div class="orb-container">
+                <img class="universe-cover" src="${getSafeUniverseCover(node.name, node.cover)}" alt="Portada de ${safeName}" loading="lazy">
+                <span class="cover-fallback">Sin portada</span>
+              </div>
+              <div class="node-info">
+                <h3>${safeName}</h3>
+              </div>
+            </button>
+          `;
+        }).join('');
+
+        mapWorld.innerHTML = `
+          <svg class="map-links-layer" id="mapLinksLayer" viewBox="0 0 ${state.mapCanvas.width} ${state.mapCanvas.height}" preserveAspectRatio="none" aria-hidden="true">
+            ${worldLinks.join('')}
+          </svg>
+          ${absorptionMarkup}
+          ${worldNodes.join('')}
+          ${nodesMarkup}
+        `;
+      };
 
       const closePopup = () => {
         const popup = document.getElementById('mapPopup');
@@ -1784,219 +1903,85 @@
         });
       };
 
-      const dragState = {
-        activeNodeId: '',
-        targetNodeId: '',
-        pointerId: null,
-        offsetX: 0,
-        offsetY: 0,
-        startClientX: 0,
-        startClientY: 0,
-        moved: false,
-        latestMove: null,
-        frameRequestId: 0,
-        highlightedActiveNodeId: '',
-        highlightedTargetNodeId: ''
-      };
-      const DRAG_OPEN_THRESHOLD = 8;
-      const DROP_TARGET_PROXIMITY = 190;
-      const toWorldPoint = (event) => {
-        const rect = mapCanvas.getBoundingClientRect();
-        const scale = state.mapViewport.scale || 1;
-        return {
-          x: (event.clientX - rect.left + mapShell.scrollLeft) / scale,
-          y: (event.clientY - rect.top + mapShell.scrollTop) / scale
-        };
-      };
-      const resetDragState = () => {
-        if (dragState.frameRequestId) {
-          window.cancelAnimationFrame(dragState.frameRequestId);
-        }
-        dragState.activeNodeId = '';
-        dragState.targetNodeId = '';
-        dragState.pointerId = null;
-        dragState.offsetX = 0;
-        dragState.offsetY = 0;
-        dragState.startClientX = 0;
-        dragState.startClientY = 0;
-        dragState.moved = false;
-        dragState.latestMove = null;
-        dragState.frameRequestId = 0;
-      };
+      if (rebuildWorld) {
+        renderMapWorldContent();
+      }
+      syncMapCanvasSize();
 
-      const updateDragTargetHighlight = (activeNodeId = '', targetNodeId = '') => {
-        if (
-          dragState.highlightedActiveNodeId === activeNodeId &&
-          dragState.highlightedTargetNodeId === targetNodeId
-        ) {
-          return;
-        }
-        viewMap.querySelectorAll('.universe-node').forEach((nodeEl) => {
-          const nodeId = nodeEl.dataset.nodeId || '';
-          nodeEl.classList.toggle('is-dragging', Boolean(activeNodeId) && nodeId === activeNodeId);
-          nodeEl.classList.toggle('is-drop-target', Boolean(targetNodeId) && nodeId === targetNodeId);
-        });
-        dragState.highlightedActiveNodeId = activeNodeId;
-        dragState.highlightedTargetNodeId = targetNodeId;
-      };
+      if (!mapViewRuntime.handlersBound) {
+        mapViewRuntime.handlersBound = true;
 
-      const updateConnectorPath = (pathEl, startX, startY, endX, endY, angle) => {
-        if (!pathEl) return;
-        const curveStrength = Number.parseFloat(pathEl.dataset.curveStrength || '');
-        const arcBias = Number.parseFloat(pathEl.dataset.arcBias || '');
-        const twistDirection = Number.parseInt(pathEl.dataset.twistDirection || '1', 10);
-        const sway = Number.parseFloat(pathEl.dataset.sway || '');
-        const path = buildConnectorPath(startX, startY, endX, endY, angle, {
-          curveStrength: Number.isFinite(curveStrength) ? curveStrength : 0.22,
-          arcBias: Number.isFinite(arcBias) ? arcBias : 0.3,
-          twistDirection: twistDirection === -1 ? -1 : 1,
-          sway: Number.isFinite(sway) ? sway : 0
-        });
-        pathEl.setAttribute('d', path);
-      };
-
-      const updateExpandedWorldsForParent = (parentNodeId) => {
-        if (!parentNodeId || !state.expandedUniverses.has(parentNodeId)) return;
-        const parentNode = state.universeNodes.find((item) => item.id === parentNodeId);
-        if (!parentNode) return;
-        const worldEls = [...viewMap.querySelectorAll(`.universe-node--world[data-parent-id="${parentNodeId}"]`)];
-        worldEls.forEach((worldEl) => {
-          const baseAngle = Number.parseFloat(worldEl.dataset.baseAngle || '0');
-          const baseDx = Number.parseFloat(worldEl.dataset.baseDx || '');
-          const baseDy = Number.parseFloat(worldEl.dataset.baseDy || '');
-          if (!Number.isFinite(baseAngle)) return;
-          const fallbackWorldRectX = Number.parseFloat(worldEl.style.left || '0');
-          const fallbackWorldRectY = Number.parseFloat(worldEl.style.top || '0');
-          const dx = Number.isFinite(baseDx) ? baseDx : (fallbackWorldRectX + WORLD_NODE_HALF_WIDTH - parentNode.x);
-          const dy = Number.isFinite(baseDy) ? baseDy : (fallbackWorldRectY + WORLD_NODE_HALF_HEIGHT - parentNode.y);
-          const targetCenterX = parentNode.x + dx;
-          const targetCenterY = parentNode.y + dy;
-          worldEl.dataset.baseDx = `${Math.round(dx)}`;
-          worldEl.dataset.baseDy = `${Math.round(dy)}`;
-          worldEl.style.left = `${Math.round(targetCenterX - WORLD_NODE_HALF_WIDTH)}px`;
-          worldEl.style.top = `${Math.round(targetCenterY - WORLD_NODE_HALF_HEIGHT)}px`;
-          const worldKey = worldEl.dataset.worldKey || '';
-          const pathEl = viewMap.querySelector(`.map-link-path[data-parent-id="${parentNodeId}"][data-world-key="${worldKey}"]`);
-          updateConnectorPath(pathEl, parentNode.x, parentNode.y, targetCenterX, targetCenterY, baseAngle);
-        });
-      };
-
-      const findDropTargetForNode = (activeNode) => {
-        if (!activeNode) return null;
-        let best = null;
-        state.universeNodes.forEach((candidateNode) => {
-          if (!candidateNode || candidateNode.id === activeNode.id) return;
-          const dx = candidateNode.x - activeNode.x;
-          const dy = candidateNode.y - activeNode.y;
-          const distance = Math.hypot(dx, dy);
-          const isColliding = Math.abs(dx) <= NODE_HALF_WIDTH && Math.abs(dy) <= NODE_HALF_HEIGHT;
-          const isNear = distance <= DROP_TARGET_PROXIMITY;
-          if (!isColliding && !isNear) return;
-          const score = (isColliding ? 0 : 1) * 1000 + distance;
-          if (!best || score < best.score) {
-            best = { node: candidateNode, score };
-          }
-        });
-        return best?.node || null;
-      };
-
-      const processDragMoveFrame = () => {
-        dragState.frameRequestId = 0;
-        const move = dragState.latestMove;
-        if (!move) return;
-        dragState.latestMove = null;
-        if (dragState.pointerId !== move.pointerId) return;
-        if (!dragState.activeNodeId) return;
-        if (!mapShell) return;
-        const node = state.universeNodes.find(item => item.id === dragState.activeNodeId);
-        if (!node) return;
-        const rawX = move.worldX - dragState.offsetX;
-        const rawY = move.worldY - dragState.offsetY;
-        const boundedX = Math.max(NODE_HALF_WIDTH, Math.min(Math.round(rawX), state.mapCanvas.width - NODE_HALF_WIDTH));
-        const boundedY = Math.max(NODE_HALF_HEIGHT, Math.min(Math.round(rawY), state.mapCanvas.height - NODE_HALF_HEIGHT));
-        node.x = boundedX;
-        node.y = boundedY;
-        move.nodeEl.style.left = `${boundedX - NODE_HALF_WIDTH}px`;
-        move.nodeEl.style.top = `${boundedY - NODE_HALF_HEIGHT}px`;
-        updateExpandedWorldsForParent(node.id);
-        const movedDistance = Math.hypot(move.clientX - dragState.startClientX, move.clientY - dragState.startClientY);
-        if (!dragState.moved && movedDistance >= DRAG_OPEN_THRESHOLD) {
-          dragState.moved = true;
-          move.nodeEl.dataset.dragMoved = '1';
-        }
-        const targetNode = findDropTargetForNode(node);
-        dragState.targetNodeId = targetNode?.id || '';
-        updateDragTargetHighlight(dragState.activeNodeId, dragState.targetNodeId);
-      };
-
-      const scheduleDragMoveFrame = () => {
-        if (dragState.frameRequestId) return;
-        dragState.frameRequestId = window.requestAnimationFrame(() => {
-          processDragMoveFrame();
-        });
-      };
-
-      const flushPendingDragMove = () => {
-        if (!dragState.latestMove) return;
-        if (dragState.frameRequestId) {
-          window.cancelAnimationFrame(dragState.frameRequestId);
-          dragState.frameRequestId = 0;
-        }
-        processDragMoveFrame();
-      };
-
-      viewMap.querySelectorAll('.universe-node').forEach(nodeEl => {
-        const coverEl = nodeEl.querySelector('.universe-cover');
-        coverEl?.addEventListener('error', () => {
+        viewMap.addEventListener('error', (event) => {
+          const coverEl = event.target;
+          if (!(coverEl instanceof HTMLImageElement) || !coverEl.classList.contains('universe-cover')) return;
           coverEl.classList.add('is-broken');
-          coverEl.src = getSafeUniverseCover(nodeEl.dataset.open, '');
-        });
-        nodeEl.addEventListener('pointerdown', (event) => {
+          const hostNode = coverEl.closest('.universe-node');
+          const fallbackName = hostNode?.dataset.open || hostNode?.dataset.worldName || '';
+          coverEl.src = getSafeUniverseCover(fallbackName, '');
+        }, true);
+
+        viewMap.addEventListener('pointerdown', (event) => {
+          const nodeEl = event.target.closest('.universe-node--universe');
+          if (!nodeEl) return;
           if (event.button !== 0) return;
-          if (!mapShell) return;
           const nodeId = nodeEl.dataset.nodeId || '';
           const node = state.universeNodes.find(item => item.id === nodeId);
           if (!node) return;
           event.preventDefault();
           event.stopPropagation();
-          dragState.activeNodeId = node.id;
-          dragState.pointerId = event.pointerId;
-          dragState.startClientX = event.clientX;
-          dragState.startClientY = event.clientY;
-          dragState.moved = false;
+          mapViewRuntime.dragState.activeNodeId = node.id;
+          mapViewRuntime.dragState.pointerId = event.pointerId;
+          mapViewRuntime.dragState.startClientX = event.clientX;
+          mapViewRuntime.dragState.startClientY = event.clientY;
+          mapViewRuntime.dragState.moved = false;
+          mapViewRuntime.dragState.activeNodeElement = nodeEl;
           const worldPoint = toWorldPoint(event);
-          dragState.offsetX = worldPoint.x - node.x;
-          dragState.offsetY = worldPoint.y - node.y;
+          mapViewRuntime.dragState.offsetX = worldPoint.x - node.x;
+          mapViewRuntime.dragState.offsetY = worldPoint.y - node.y;
           nodeEl.dataset.dragMoved = '0';
-          dragState.targetNodeId = '';
+          mapViewRuntime.dragState.targetNodeId = '';
           updateDragTargetHighlight(node.id, '');
           nodeEl.setPointerCapture(event.pointerId);
         });
-        nodeEl.addEventListener('pointermove', (event) => {
-          if (dragState.pointerId !== event.pointerId) return;
-          if (!dragState.activeNodeId) return;
+
+        viewMap.addEventListener('pointermove', (event) => {
+          if (mapViewRuntime.dragState.pointerId !== event.pointerId) return;
+          if (!mapViewRuntime.dragState.activeNodeId) return;
+          const nodeEl = mapViewRuntime.dragState.activeNodeElement;
+          if (!nodeEl) return;
+          const node = state.universeNodes.find(item => item.id === mapViewRuntime.dragState.activeNodeId);
+          if (!node) return;
           event.preventDefault();
           const worldPoint = toWorldPoint(event);
-          dragState.latestMove = {
-            pointerId: event.pointerId,
-            clientX: event.clientX,
-            clientY: event.clientY,
-            worldX: worldPoint.x,
-            worldY: worldPoint.y,
-            nodeEl
-          };
-          scheduleDragMoveFrame();
+          const rawX = worldPoint.x - mapViewRuntime.dragState.offsetX;
+          const rawY = worldPoint.y - mapViewRuntime.dragState.offsetY;
+          const boundedX = Math.max(NODE_HALF_WIDTH, Math.min(Math.round(rawX), state.mapCanvas.width - NODE_HALF_WIDTH));
+          const boundedY = Math.max(NODE_HALF_HEIGHT, Math.min(Math.round(rawY), state.mapCanvas.height - NODE_HALF_HEIGHT));
+          node.x = boundedX;
+          node.y = boundedY;
+          nodeEl.style.left = `${boundedX - NODE_HALF_WIDTH}px`;
+          nodeEl.style.top = `${boundedY - NODE_HALF_HEIGHT}px`;
+          updateExpandedWorldsForParent(node.id);
+          const movedDistance = Math.hypot(event.clientX - mapViewRuntime.dragState.startClientX, event.clientY - mapViewRuntime.dragState.startClientY);
+          if (!mapViewRuntime.dragState.moved && movedDistance >= DRAG_OPEN_THRESHOLD) {
+            mapViewRuntime.dragState.moved = true;
+            nodeEl.dataset.dragMoved = '1';
+          }
+          const targetNode = findDropTargetForNode(node);
+          mapViewRuntime.dragState.targetNodeId = targetNode?.id || '';
+          updateDragTargetHighlight(mapViewRuntime.dragState.activeNodeId, mapViewRuntime.dragState.targetNodeId);
         });
+
         const finishDrag = (event) => {
-          if (dragState.pointerId !== event.pointerId) return;
-          if (!dragState.activeNodeId) return;
-          flushPendingDragMove();
-          const activeNodeId = dragState.activeNodeId;
-          const targetNodeId = dragState.targetNodeId;
-          if (nodeEl.hasPointerCapture(event.pointerId)) {
+          if (mapViewRuntime.dragState.pointerId !== event.pointerId) return;
+          if (!mapViewRuntime.dragState.activeNodeId) return;
+          const nodeEl = mapViewRuntime.dragState.activeNodeElement;
+          const activeNodeId = mapViewRuntime.dragState.activeNodeId;
+          const targetNodeId = mapViewRuntime.dragState.targetNodeId;
+          if (nodeEl?.hasPointerCapture(event.pointerId)) {
             nodeEl.releasePointerCapture(event.pointerId);
           }
-          const didMove = dragState.moved;
+          const didMove = mapViewRuntime.dragState.moved;
           resetDragState();
           updateDragTargetHighlight('', '');
           if (!didMove) return;
@@ -2036,7 +2021,7 @@
                   };
                   window.setTimeout(() => {
                     state.mapAbsorptionEffect = null;
-                    if (state.view === 'map') renderMapView();
+                    if (state.view === 'map') renderMapView({ rebuildWorld: true });
                   }, 760);
                   state.expandedUniverses.delete(activeNodeId);
                 }
@@ -2046,14 +2031,110 @@
           saveUniverseNodes();
           if (membershipsChanged) saveUniverseMemberships();
           if (membershipsChanged || state.mapAbsorptionEffect) {
-            renderMapView();
+            renderMapView({ rebuildWorld: true });
             return;
           }
           syncMapCanvasSize();
         };
-        nodeEl.addEventListener('pointerup', finishDrag);
-        nodeEl.addEventListener('pointercancel', finishDrag);
-        nodeEl.addEventListener('click', (event) => {
+
+        viewMap.addEventListener('pointerup', finishDrag);
+        viewMap.addEventListener('pointercancel', finishDrag);
+
+        viewMap.addEventListener('click', (event) => {
+          const undoBtn = event.target.closest('#undoAllAbsorptions');
+          if (undoBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const currentMemberships = state.universeMemberships || {};
+            const parentsWithAbsorptions = [...new Set(
+              Object.values(currentMemberships)
+                .map((parentId) => String(parentId || '').trim())
+                .filter(Boolean)
+            )];
+            if (!parentsWithAbsorptions.length) {
+              alert('No hay absorciones para disolver.');
+              return;
+            }
+            const availableUniverseNames = parentsWithAbsorptions
+              .map((parentId) => state.universeNodes.find((node) => node.id === parentId)?.name || '')
+              .filter(Boolean)
+              .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
+            if (!availableUniverseNames.length) {
+              alert('No se encontraron universos con absorciones activas.');
+              return;
+            }
+            const promptMessage = [
+              'Elige el universo para ejecutar la Explosión Big Bang:',
+              ...availableUniverseNames.map((name, idx) => `${idx + 1}. ${name}`)
+            ].join('\n');
+            const selection = window.prompt(promptMessage, availableUniverseNames[0] || '');
+            if (selection === null) return;
+            const normalizedSelection = normalizeUniverseName(selection);
+            const selectedByIndex = Number.parseInt(selection, 10);
+            const selectedUniverseName = Number.isInteger(selectedByIndex) && selectedByIndex >= 1 && selectedByIndex <= availableUniverseNames.length
+              ? availableUniverseNames[selectedByIndex - 1]
+              : availableUniverseNames.find((name) => normalizeUniverseName(name) === normalizedSelection);
+            if (!selectedUniverseName) {
+              alert('No se reconoció ese universo. Intenta de nuevo con el nombre o número de la lista.');
+              return;
+            }
+            const selectedUniverseNode = state.universeNodes.find(
+              (node) => normalizeUniverseName(node.name) === normalizeUniverseName(selectedUniverseName)
+            );
+            if (!selectedUniverseNode) {
+              alert('No se pudo encontrar el universo seleccionado.');
+              return;
+            }
+            let dissolutions = 0;
+            const nextMemberships = {};
+            Object.entries(currentMemberships).forEach(([childId, parentId]) => {
+              if (String(parentId || '') === selectedUniverseNode.id) {
+                dissolutions += 1;
+                return;
+              }
+              nextMemberships[childId] = parentId;
+            });
+            if (!dissolutions) {
+              alert(`"${selectedUniverseName}" no tiene absorciones activas.`);
+              return;
+            }
+            state.universeMemberships = nextMemberships;
+            state.universeNodes = (state.universeNodes || []).map((node) => {
+              const parentId = state.universeMemberships[node.id] || '';
+              const parentIds = getParentUniverseIdsForNode(node).filter((item) => item !== selectedUniverseNode.id);
+              const normalizedParentIds = parentId
+                ? [parentId, ...parentIds.filter((item) => item !== parentId)]
+                : parentIds;
+              return {
+                ...node,
+                kind: normalizedParentIds.length ? 'world' : 'universe',
+                parentUniverseId: parentId,
+                parentUniverseIds: normalizedParentIds
+              };
+            });
+            state.mapAbsorptionEffect = null;
+            saveUniverseMemberships();
+            saveUniverseNodes();
+            renderMapView();
+            return;
+          }
+
+          const worldEl = event.target.closest('.universe-node--world');
+          if (worldEl) {
+            event.preventDefault();
+            event.stopPropagation();
+            const worldName = worldEl.dataset.worldName;
+            if (!worldName) return;
+            state.universe = worldName;
+            state.selectedVideoId = null;
+            state.showAddForm = false;
+            state.showEditUniverseForm = false;
+            changeView('universe');
+            return;
+          }
+
+          const nodeEl = event.target.closest('.universe-node--universe');
+          if (!nodeEl) return;
           if (nodeEl.dataset.dragMoved === '1') {
             nodeEl.dataset.dragMoved = '0';
             event.preventDefault();
@@ -2082,152 +2163,43 @@
               }
             }
           }
-          renderMapView();
+          renderMapView({ rebuildWorld: true });
         });
-      });
 
-      viewMap.querySelectorAll('.universe-node--world').forEach((worldEl) => {
-        const coverEl = worldEl.querySelector('.universe-cover');
-        coverEl?.addEventListener('error', () => {
-          coverEl.classList.add('is-broken');
-          coverEl.src = getSafeUniverseCover(worldEl.dataset.worldName, '');
-        });
-        worldEl.addEventListener('click', (event) => {
+        viewMap.addEventListener('contextmenu', (event) => {
+          const world = event.target.closest('#mapWorld');
+          if (!world) return;
           event.preventDefault();
           event.stopPropagation();
-          const worldName = worldEl.dataset.worldName;
-          if (!worldName) return;
-          state.universe = worldName;
-          state.selectedVideoId = null;
-          state.showAddForm = false;
-          state.showEditUniverseForm = false;
-          changeView('universe');
+          const rect = mapCanvas.getBoundingClientRect();
+          const scale = state.mapViewport.scale || 1;
+          const worldX = (event.clientX - rect.left + mapShell.scrollLeft) / scale;
+          const worldY = (event.clientY - rect.top + mapShell.scrollTop) / scale;
+          openPopupAt(worldX, worldY);
         });
-      });
 
-      const undoAllAbsorptionsBtn = viewMap.querySelector('#undoAllAbsorptions');
-      if (undoAllAbsorptionsBtn) {
-        undoAllAbsorptionsBtn.addEventListener('click', (event) => {
+        mapShell.addEventListener('wheel', (event) => {
           event.preventDefault();
           event.stopPropagation();
-
-          const currentMemberships = state.universeMemberships || {};
-          const parentsWithAbsorptions = [...new Set(
-            Object.values(currentMemberships)
-              .map((parentId) => String(parentId || '').trim())
-              .filter(Boolean)
-          )];
-          if (!parentsWithAbsorptions.length) {
-            alert('No hay absorciones para disolver.');
-            return;
-          }
-
-          const availableUniverseNames = parentsWithAbsorptions
-            .map((parentId) => state.universeNodes.find((node) => node.id === parentId)?.name || '')
-            .filter(Boolean)
-            .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-
-          if (!availableUniverseNames.length) {
-            alert('No se encontraron universos con absorciones activas.');
-            return;
-          }
-
-          const promptMessage = [
-            'Elige el universo para ejecutar la Explosión Big Bang:',
-            ...availableUniverseNames.map((name, idx) => `${idx + 1}. ${name}`)
-          ].join('\n');
-          const selection = window.prompt(promptMessage, availableUniverseNames[0] || '');
-          if (selection === null) return;
-
-          const normalizedSelection = normalizeUniverseName(selection);
-          const selectedByIndex = Number.parseInt(selection, 10);
-          const selectedUniverseName = Number.isInteger(selectedByIndex) && selectedByIndex >= 1 && selectedByIndex <= availableUniverseNames.length
-            ? availableUniverseNames[selectedByIndex - 1]
-            : availableUniverseNames.find((name) => normalizeUniverseName(name) === normalizedSelection);
-
-          if (!selectedUniverseName) {
-            alert('No se reconoció ese universo. Intenta de nuevo con el nombre o número de la lista.');
-            return;
-          }
-
-          const selectedUniverseNode = state.universeNodes.find(
-            (node) => normalizeUniverseName(node.name) === normalizeUniverseName(selectedUniverseName)
-          );
-          if (!selectedUniverseNode) {
-            alert('No se pudo encontrar el universo seleccionado.');
-            return;
-          }
-
-          let dissolutions = 0;
-          const nextMemberships = {};
-          Object.entries(currentMemberships).forEach(([childId, parentId]) => {
-            if (String(parentId || '') === selectedUniverseNode.id) {
-              dissolutions += 1;
-              return;
-            }
-            nextMemberships[childId] = parentId;
+          if (event.deltaY === 0) return;
+          const rect = mapCanvas.getBoundingClientRect();
+          const scale = state.mapViewport.scale || 1;
+          const worldX = (event.clientX - rect.left + mapShell.scrollLeft) / scale;
+          const worldY = (event.clientY - rect.top + mapShell.scrollTop) / scale;
+          const direction = event.deltaY < 0 ? 1 : -1;
+          const nextScale = direction > 0
+            ? scale * WHEEL_ZOOM_FACTOR
+            : scale / WHEEL_ZOOM_FACTOR;
+          applyMapScale(nextScale, {
+            x: worldX,
+            y: worldY,
+            pointerX: event.clientX - rect.left,
+            pointerY: event.clientY - rect.top
           });
+        }, { passive: false });
 
-          if (!dissolutions) {
-            alert(`"${selectedUniverseName}" no tiene absorciones activas.`);
-            return;
-          }
-
-          state.universeMemberships = nextMemberships;
-          state.universeNodes = (state.universeNodes || []).map((node) => {
-            const parentId = state.universeMemberships[node.id] || '';
-            const parentIds = getParentUniverseIdsForNode(node).filter((item) => item !== selectedUniverseNode.id);
-            const normalizedParentIds = parentId
-              ? [parentId, ...parentIds.filter((item) => item !== parentId)]
-              : parentIds;
-            return {
-              ...node,
-              kind: normalizedParentIds.length ? 'world' : 'universe',
-              parentUniverseId: parentId,
-              parentUniverseIds: normalizedParentIds
-            };
-          });
-          state.mapAbsorptionEffect = null;
-          saveUniverseMemberships();
-          saveUniverseNodes();
-          renderMapView();
-        });
+        window.addEventListener('resize', syncMapCanvasSize, { once: true });
       }
-
-      mapWorld.addEventListener('contextmenu', (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!mapShell) return;
-        const rect = mapCanvas.getBoundingClientRect();
-        const scale = state.mapViewport.scale || 1;
-        const worldX = (event.clientX - rect.left + mapShell.scrollLeft) / scale;
-        const worldY = (event.clientY - rect.top + mapShell.scrollTop) / scale;
-        openPopupAt(worldX, worldY);
-      });
-
-      const handleWheelZoom = (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        if (!mapShell) return;
-        if (event.deltaY === 0) return;
-        const rect = mapCanvas.getBoundingClientRect();
-        const scale = state.mapViewport.scale || 1;
-        const worldX = (event.clientX - rect.left + mapShell.scrollLeft) / scale;
-        const worldY = (event.clientY - rect.top + mapShell.scrollTop) / scale;
-        const direction = event.deltaY < 0 ? 1 : -1;
-        const nextScale = direction > 0
-          ? scale * WHEEL_ZOOM_FACTOR
-          : scale / WHEEL_ZOOM_FACTOR;
-        applyMapScale(nextScale, {
-          x: worldX,
-          y: worldY,
-          pointerX: event.clientX - rect.left,
-          pointerY: event.clientY - rect.top
-        });
-      };
-      mapShell?.addEventListener('wheel', handleWheelZoom, { passive: false });
-
-      window.addEventListener('resize', syncMapCanvasSize, { once: true });
     }
 
     function renderInicioView() {
