@@ -1104,11 +1104,16 @@
       border-color: rgba(209, 223, 246, .56);
       background: linear-gradient(160deg, rgba(106, 116, 132, .9), rgba(79, 91, 111, .85));
     }
-    .universe-controls .icon-only.delete {
-      color: #ffd8d8;
-      border-color: rgba(255, 116, 116, .6);
-      background: linear-gradient(160deg, rgba(171, 26, 26, .95), rgba(121, 12, 18, .92));
-      box-shadow: 0 0 0 1px rgba(255, 103, 103, .26), 0 0 16px rgba(255, 62, 62, .22);
+    .universe-controls .icon-only.blackhole {
+      color: #d8e5ff;
+      border-color: rgba(142, 116, 255, .62);
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, .22), rgba(255, 255, 255, 0) 34%),
+        radial-gradient(circle at 50% 55%, rgba(13, 10, 26, .96) 0 24%, rgba(72, 33, 145, .95) 46%, rgba(21, 11, 46, .98) 64%);
+      box-shadow:
+        0 0 0 1px rgba(139, 98, 255, .35),
+        0 0 14px rgba(130, 82, 255, .45),
+        inset 0 0 20px rgba(60, 22, 141, .58);
     }
     .universe-edit-panel {
       margin-top: 12px;
