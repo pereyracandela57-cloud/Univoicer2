@@ -1430,7 +1430,27 @@
     }
 
     function getUniverseWorldEntries(universeName) {
-      return getUniverseChildWorldEntries(universeName);
+      const entries = getUniverseChildWorldEntries(universeName);
+      const parentNode = state.universeNodes.find((node) => normalizeUniverseName(node.name) === normalizeUniverseName(universeName));
+      if (!parentNode) return entries;
+
+      const parentUniverseData = groupByUniverse()[normalizeUniverseName(parentNode.name)];
+      const hasOwnCharacters = (parentUniverseData?.totalCharacters || 0) > 0;
+      if (!hasOwnCharacters) return entries;
+
+      const parentKey = normalizeUniverseName(parentNode.name);
+      const alreadyIncluded = entries.some((entry) => normalizeUniverseName(entry.name) === parentKey);
+      if (!alreadyIncluded) {
+        entries.push({
+          id: parentNode.id,
+          name: parentNode.name,
+          cover: parentNode.cover || '',
+          unlocked: true,
+          stats: parentUniverseData
+        });
+      }
+
+      return entries.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
     }
 
     function getConnectorVariant(seedKey) {
