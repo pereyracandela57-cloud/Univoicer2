@@ -82,7 +82,6 @@
       videos: []
     };
 
-    const MARATHON_ENDED_FALLBACK_MS = 0; // Fallback opcional: 0 = desactivado.
     let marathonPlayer = null;
     let marathonPlayerReady = false;
     let marathonPlayerApiPromise = null;
@@ -4366,10 +4365,6 @@
       const playlistOptions = marathon.playlists.map((playlist) => (
         `<option value="${playlist.id}" ${playlist.id === marathon.activePlaylistId ? 'selected' : ''}>${playlist.name}</option>`
       )).join('');
-      const currentVideo = marathon.queue[marathon.position] || null;
-      const embedUrl = currentVideo
-        ? toEmbedUrl(currentVideo.url_youtube || currentVideo.url_video || '', marathon.isPlaying ? 1 : 0)
-        : '';
       viewMaraton.innerHTML = `
         <section class="marathon">
           <header class="marathon-header">
@@ -4383,8 +4378,8 @@
                 ${playlistOptions}
               </select>
               <div class="marathon-player-shell">
-                ${embedUrl
-                  ? `<iframe src="${embedUrl}" title="${escapeHtml(currentVideo?.titulo || 'Reproductor de maratón')}" allow="autoplay; encrypted-media" allowfullscreen></iframe>`
+                ${marathon.queue.length
+                  ? '<div id="marathonPlayerMount"></div>'
                   : '<div class="marathon-empty">No hay videos disponibles para esta playlist.</div>'}
               </div>
               <div class="marathon-controls">
@@ -4422,22 +4417,20 @@
       document.getElementById('marathonPlayPauseBtn')?.addEventListener('click', () => {
         if (!state.marathon.queue.length) return;
         state.marathon.isPlaying = !state.marathon.isPlaying;
-        renderMaratonView();
+        setMarathonPlaybackState(state.marathon.isPlaying);
+        updateMarathonUiState();
       });
       document.getElementById('marathonPrevBtn')?.addEventListener('click', () => {
         if (!state.marathon.queue.length) return;
-        const nextPosition = state.marathon.position > 0
+        state.marathon.position = state.marathon.position > 0
           ? state.marathon.position - 1
           : state.marathon.queue.length - 1;
-        state.marathon.position = nextPosition;
         state.marathon.isPlaying = true;
-        renderMaratonView();
+        loadMarathonVideoAtCurrentPosition();
       });
       document.getElementById('marathonNextBtn')?.addEventListener('click', () => {
         if (!state.marathon.queue.length) return;
-        state.marathon.position = (state.marathon.position + 1) % state.marathon.queue.length;
-        state.marathon.isPlaying = true;
-        renderMaratonView();
+        advanceMarathonQueue();
       });
       document.getElementById('marathonShuffleBtn')?.addEventListener('click', () => {
         state.marathon.shuffleEnabled = !state.marathon.shuffleEnabled;
@@ -4449,9 +4442,11 @@
           const selectedIndex = Number(button.dataset.marathonIndex);
           if (!Number.isFinite(selectedIndex) || selectedIndex < 0 || selectedIndex >= state.marathon.queue.length) return;
           state.marathon.position = selectedIndex;
-          state.marathon.isPlaying = true;
-          renderMaratonView();
+          loadMarathonVideoAtCurrentPosition();
         });
+      });
+      ensureMarathonQueuePlayer().then(() => {
+        loadMarathonVideoAtCurrentPosition({ forceLoad: true });
       });
     }
 
@@ -4985,156 +4980,84 @@
       return marathonPlayerApiPromise;
     }
 
-    function clearMarathonFallbackTimer() {
-      clearTimeout(window.__marathonFallback);
+    function getCurrentMarathonYoutubeId() {
+      const currentVideo = state.marathon.queue[state.marathon.position];
+      return getYoutubeId(currentVideo?.url_youtube || currentVideo?.url_video || '');
     }
 
-    async function ensureMarathonPlayer() {
-      const mount = document.getElementById('videoPlayer');
+    function updateMarathonUiState() {
+      const playPauseBtn = document.getElementById('marathonPlayPauseBtn');
+      if (playPauseBtn) playPauseBtn.textContent = state.marathon.isPlaying ? 'Pausa' : 'Play';
+      viewMaraton.querySelectorAll('[data-marathon-index]').forEach((button) => {
+        const index = Number(button.dataset.marathonIndex);
+        button.classList.toggle('active', index === state.marathon.position);
+      });
+    }
+
+    async function ensureMarathonQueuePlayer() {
+      const mount = document.getElementById('marathonPlayerMount');
       if (!mount) return null;
       await ensureYoutubeIframeApi();
-      if (marathonPlayer && marathonPlayer.getIframe && document.body.contains(marathonPlayer.getIframe())) {
+      if (marathonPlayer && marathonPlayer.getIframe && mount.contains(marathonPlayer.getIframe())) {
         return marathonPlayer;
       }
+      const initialVideoId = getCurrentMarathonYoutubeId();
       marathonPlayerReady = false;
-      marathonPlayer = new window.YT.Player('videoPlayer', {
-        playerVars: { rel: 0, modestbranding: 1, autoplay: 1 },
+      marathonPlayer = new window.YT.Player('marathonPlayerMount', {
+        videoId: initialVideoId || undefined,
+        playerVars: { autoplay: 1, rel: 0, modestbranding: 1 },
         events: {
-          onReady: () => { marathonPlayerReady = true; },
+          onReady: () => {
+            marathonPlayerReady = true;
+            if (state.marathon.isPlaying) marathonPlayer.playVideo?.();
+          },
           onStateChange: (event) => {
-            if (event.data === window.YT.PlayerState.ENDED) playNext();
+            if (event.data === window.YT.PlayerState.ENDED) {
+              advanceMarathonQueue();
+            }
           }
         }
       });
       return marathonPlayer;
     }
 
-    function finishMarathon(message = 'Maratón finalizada. No hay más videos en cola.') {
-      state.marathon.active = false;
-      state.marathon.finished = true;
-      clearMarathonFallbackTimer();
-      if (marathonPlayerReady && marathonPlayer?.stopVideo) marathonPlayer.stopVideo();
-      updateMarathonLabel(message);
-    }
-
-    function startMarathon() {
-      const queue = getMarathonQueue();
-      if (!queue.length) return;
-      state.marathon.playlists = [{ id: 'auto', name: 'Automática', videos: queue }];
-      state.marathon.activePlaylistId = 'auto';
-      state.marathon.queue = state.marathon.shuffleEnabled ? shuffleVideos(queue) : [...queue];
-      state.marathon.position = 0;
-      state.marathon.isPlaying = true;
-      state.selectedVideoId = queue[0].id;
-      renderUniverseView();
-      updateMarathonLabel();
-    }
-
-    async function nextInMarathon() {  // <-- 1. Agrega 'async' aquí
-      if (!state.marathon.isPlaying) return;
-      if (state.marathon.position >= state.marathon.queue.length - 1) {
-        state.marathon.isPlaying = false;
-        updateMarathonLabel('Maratón finalizado.');
-        return;
-      }
-      state.selectedVideoId = current.id;
-      if (state.view === 'universe') renderUniverseView();
-      updateMarathonLabel();
-    
-      const player = await ensureMarathonPlayer(); // <-- 2. Ahora este await funcionará sin dar error
-      if (!player) return;
-      if (player.loadVideoById) player.loadVideoById(currentId); 
-      attachPlayerEndedHandler();
-    }
-
-    function pickRandomUnplayedIndex() {
-      const played = new Set(state.marathon.history);
-      const options = state.marathon.queue
-        .map((_, index) => index)
-        .filter((index) => !played.has(index));
-      if (!options.length) return -1;
-      return options[Math.floor(Math.random() * options.length)];
-    }
-
-    function playNext() {
-      if (!state.marathon.active) return;
-      const { queue, shuffleEnabled } = state.marathon;
-      if (!queue.length) {
-        finishMarathon();
-        return;
-      }
-
-      if (shuffleEnabled) {
-        const nextIndex = pickRandomUnplayedIndex();
-        if (nextIndex < 0) {
-          finishMarathon();
-          return;
-        }
-        state.marathon.position = nextIndex;
-      } else if (state.marathon.position >= queue.length - 1) {
-        finishMarathon();
-        return;
-      } else {
-        state.marathon.position += 1;
-      }
-
-      if (state.marathon.history[state.marathon.history.length - 1] !== state.marathon.position) {
-        state.marathon.history.push(state.marathon.position);
-      }
-      playCurrent();
-    }
-
-    function playPrevious() {
-      if (!state.marathon.active) return;
-      if (state.marathon.history.length > 1) {
-        state.marathon.history.pop();
-        state.marathon.position = state.marathon.history[state.marathon.history.length - 1];
-        playCurrent();
-        return;
-      }
-      if (state.marathon.position > 0) {
-        state.marathon.position -= 1;
-        state.marathon.history = [state.marathon.position];
-        playCurrent();
-      }
-    }
-
-    function togglePause() {
+    function setMarathonPlaybackState(shouldPlay) {
       if (!marathonPlayerReady || !marathonPlayer) return;
-      const currentState = marathonPlayer.getPlayerState?.();
-      if (currentState === window.YT.PlayerState.PLAYING) {
-        marathonPlayer.pauseVideo();
+      if (shouldPlay) {
+        marathonPlayer.playVideo?.();
       } else {
-        marathonPlayer.playVideo();
+        marathonPlayer.pauseVideo?.();
       }
     }
 
-    function updateMarathonLabel(override) {
-      const el = document.getElementById('marathonState');
-      if (!el) return;
-      if (override) {
-        el.textContent = override;
+    async function loadMarathonVideoAtCurrentPosition({ forceLoad = false } = {}) {
+      const videoId = getCurrentMarathonYoutubeId();
+      if (!videoId) {
+        updateMarathonUiState();
         return;
       }
-      if (state.marathon.isPlaying) {
-        el.textContent = `Reproduciendo ${state.marathon.position + 1} de ${state.marathon.queue.length}`;
-      } else {
-        el.textContent = 'Modo Maratón desactivado';
+      const player = await ensureMarathonQueuePlayer();
+      if (!player || !marathonPlayerReady) {
+        updateMarathonUiState();
+        return;
       }
+      const currentPlayerVideoId = player.getVideoData?.().video_id || '';
+      if (forceLoad || currentPlayerVideoId !== videoId) {
+        player.loadVideoById(videoId);
+      }
+      setMarathonPlaybackState(state.marathon.isPlaying);
+      updateMarathonUiState();
     }
 
-    function attachPlayerEndedHandler() {
-      const iframe = document.getElementById('videoPlayer');
-      if (!iframe) return;
-      const currentUrl = new URL(iframe.src);
-      const videoId = currentUrl.pathname.split('/').pop();
-
-      // Fallback simple: avanza cada 12s en modo maratón si no se puede captar evento "ended" del reproductor embebido.
-      // Esto mantiene la reproducción encadenada sin interacción adicional tras activar maratón.
-      clearTimeout(window.__marathonFallback);
-      if (state.marathon.isPlaying && videoId) {
-        window.__marathonFallback = setTimeout(nextInMarathon, 12000);
+    function advanceMarathonQueue() {
+      if (!state.marathon.queue.length) return;
+      if (state.marathon.position < state.marathon.queue.length - 1) {
+        state.marathon.position += 1;
+      } else {
+        state.marathon.position = 0;
       }
+      state.marathon.isPlaying = true;
+      loadMarathonVideoAtCurrentPosition({ forceLoad: true });
     }
 
     function changeView(next) {
