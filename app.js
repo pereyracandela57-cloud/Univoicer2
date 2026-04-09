@@ -1522,7 +1522,7 @@
       const MAX_MAP_ZOOM = 2.0;
       const WHEEL_ZOOM_FACTOR = 1.1;
       const DRAG_OPEN_THRESHOLD = 8;
-      const DROP_TARGET_PROXIMITY = 190;
+      const DROP_TARGET_EDGE_SNAP_DISTANCE = 44;
 
       const syncMapZoomDisplay = (scaleValue) => {
         const percentage = `${Math.round(scaleValue * 100)}%`;
@@ -1659,13 +1659,15 @@
         let best = null;
         state.universeNodes.forEach((candidateNode) => {
           if (!candidateNode || candidateNode.id === activeNode.id) return;
+          if (getUniverseParentId(candidateNode.id)) return;
           const dx = candidateNode.x - activeNode.x;
           const dy = candidateNode.y - activeNode.y;
-          const distance = Math.hypot(dx, dy);
-          const isColliding = Math.abs(dx) <= NODE_HALF_WIDTH && Math.abs(dy) <= NODE_HALF_HEIGHT;
-          const isNear = distance <= DROP_TARGET_PROXIMITY;
-          if (!isColliding && !isNear) return;
-          const score = (isColliding ? 0 : 1) * 1000 + distance;
+          const centerDistance = Math.hypot(dx, dy);
+          const edgeGapX = Math.max(0, Math.abs(dx) - (NODE_HALF_WIDTH * 2));
+          const edgeGapY = Math.max(0, Math.abs(dy) - (NODE_HALF_HEIGHT * 2));
+          const edgeDistance = Math.hypot(edgeGapX, edgeGapY);
+          if (edgeDistance > DROP_TARGET_EDGE_SNAP_DISTANCE) return;
+          const score = (edgeDistance * 1000) + centerDistance;
           if (!best || score < best.score) {
             best = { node: candidateNode, score };
           }
