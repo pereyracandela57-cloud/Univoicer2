@@ -2503,7 +2503,7 @@
             >
               ✏️
             </button>
-            <button id="deleteUniverse" class="neon-btn neon-action icon-only delete" title="Eliminar universo" aria-label="Eliminar universo">🗑️</button>
+            <button id="blackHoleDeleteUniverse" class="neon-btn neon-action icon-only blackhole" title="Agujero negro: borrar universo" aria-label="Agujero negro: borrar universo">🕳️</button>
             <button
               id="btn-toggle-video"
               class="neon-btn neon-btn--primary neon-action"
@@ -2786,18 +2786,23 @@
         renderMapView();
         renderUniverseView();
       });
-      document.getElementById('deleteUniverse').onclick = () => {
-        const ok = confirm(`¿Eliminar universo "${state.universe}"? Se quitará de los videos relacionados.`);
+      document.getElementById('blackHoleDeleteUniverse').onclick = () => {
+        const ok = confirm(`🕳️ Agujero negro\n\n¿Borrar por completo el universo "${state.universe}"?\n\n• Sus mundos hijos quedarán dispersos como universos.\n• Los personajes que solo estaban aquí pasarán a "Sin universo".`);
         if (!ok) return;
         const currentUniverseKey = normalizeUniverseName(state.universe || '');
         const removedNode = state.universeNodes.find(node => normalizeUniverseName(node.name) === currentUniverseKey);
         state.universeNodes = state.universeNodes.filter(node => normalizeUniverseName(node.name) !== currentUniverseKey)
           .map((node) => {
+            const isDirectChildOfRemovedUniverse = Boolean(removedNode?.id) && String(state.universeMemberships[node.id] || '').trim() === removedNode.id;
             const parentIds = getParentUniverseIdsForNode(node).filter((id) => id !== removedNode?.id);
-            const primaryParentId = String(state.universeMemberships[node.id] || '').trim();
-            const normalizedParentIds = primaryParentId
-              ? [primaryParentId, ...parentIds.filter((id) => id !== primaryParentId)]
-              : parentIds;
+            const primaryParentId = isDirectChildOfRemovedUniverse
+              ? ''
+              : String(state.universeMemberships[node.id] || '').trim();
+            const normalizedParentIds = isDirectChildOfRemovedUniverse
+              ? []
+              : (primaryParentId
+                ? [primaryParentId, ...parentIds.filter((id) => id !== primaryParentId)]
+                : parentIds);
             return {
               ...node,
               parentUniverseIds: normalizedParentIds,
@@ -2812,11 +2817,9 @@
           });
         }
         VIDEOS.forEach(video => {
-          video.universo = getVideoUniverses(video).filter(name => normalizeUniverseName(name) !== currentUniverseKey);
+          const remainingUniverses = getVideoUniverses(video).filter(name => normalizeUniverseName(name) !== currentUniverseKey);
+          video.universo = remainingUniverses.length ? remainingUniverses : [SPECIAL_UNASSIGNED_UNIVERSE];
         });
-        for (let i = VIDEOS.length - 1; i >= 0; i -= 1) {
-          if (!getVideoUniverses(VIDEOS[i]).length) VIDEOS.splice(i, 1);
-        }
         sanitizeUniverseMembershipsAndPersist();
         saveUniverseMemberships();
         saveUniverseNodes();
