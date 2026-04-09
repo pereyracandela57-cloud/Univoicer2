@@ -1597,9 +1597,8 @@
         viewMap.innerHTML = `
           <div class="universe-map-shell">
             <div class="map-toolbar">
-              <button type="button" id="undoAllAbsorptions" class="neon-btn map-reset-btn" aria-label="Explosión Big Bang clásica">💥 Explosión Big Bang</button>
-              <button type="button" class="neon-btn map-tool-btn map-tool-btn--bigbang" data-map-tool="bigbang" aria-label="Herramienta Big Bang">💥 Big Bang</button>
-              <button type="button" class="neon-btn map-tool-btn map-tool-btn--blackhole" data-map-tool="blackhole" aria-label="Herramienta Agujero negro">🕳️ Agujero negro</button>
+              <button type="button" id="mapToolBigBang" class="neon-btn map-tool-btn map-tool-btn--bigbang" data-map-tool="bigbang" aria-label="Herramienta Big Bang (arrastra al nodo)">💥 Explosión</button>
+              <button type="button" id="mapToolBlackhole" class="neon-btn map-tool-btn map-tool-btn--blackhole" data-map-tool="blackhole" aria-label="Herramienta Agujero negro (arrastra al nodo)">🕳️ Agujero negro</button>
             </div>
             <div id="universeMapCanvas" aria-label="Mapa de universos explorable">
               <div class="map-nebula-layer" aria-hidden="true"></div>
@@ -2360,109 +2359,6 @@
         viewMap.addEventListener('pointercancel', finishDrag);
 
         viewMap.addEventListener('click', (event) => {
-          const undoBtn = event.target.closest('#undoAllAbsorptions');
-          if (undoBtn) {
-            event.preventDefault();
-            event.stopPropagation();
-            const currentMemberships = state.universeMemberships || {};
-            const parentsWithAbsorptions = [...new Set(
-              Object.values(currentMemberships)
-                .map((parentId) => String(parentId || '').trim())
-                .filter(Boolean)
-            )];
-            if (!parentsWithAbsorptions.length) {
-              alert('No hay absorciones para disolver.');
-              return;
-            }
-            const availableUniverseNames = parentsWithAbsorptions
-              .map((parentId) => state.universeNodes.find((node) => node.id === parentId)?.name || '')
-              .filter(Boolean)
-              .sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
-            if (!availableUniverseNames.length) {
-              alert('No se encontraron universos con absorciones activas.');
-              return;
-            }
-            const promptMessage = [
-              'Elige el universo para ejecutar la Explosión Big Bang:',
-              ...availableUniverseNames.map((name, idx) => `${idx + 1}. ${name}`)
-            ].join('\n');
-            const selection = window.prompt(promptMessage, availableUniverseNames[0] || '');
-            if (selection === null) return;
-            const normalizedSelection = normalizeUniverseName(selection);
-            const selectedByIndex = Number.parseInt(selection, 10);
-            const selectedUniverseName = Number.isInteger(selectedByIndex) && selectedByIndex >= 1 && selectedByIndex <= availableUniverseNames.length
-              ? availableUniverseNames[selectedByIndex - 1]
-              : availableUniverseNames.find((name) => normalizeUniverseName(name) === normalizedSelection);
-            if (!selectedUniverseName) {
-              alert('No se reconoció ese universo. Intenta de nuevo con el nombre o número de la lista.');
-              return;
-            }
-            const selectedUniverseNode = state.universeNodes.find(
-              (node) => normalizeUniverseName(node.name) === normalizeUniverseName(selectedUniverseName)
-            );
-            if (!selectedUniverseNode) {
-              alert('No se pudo encontrar el universo seleccionado.');
-              return;
-            }
-            const absorbedWorldNodes = Object.entries(currentMemberships)
-              .filter(([, parentId]) => String(parentId || '') === selectedUniverseNode.id)
-              .map(([childId]) => state.universeNodes.find((node) => node.id === childId))
-              .filter((node) => node?.name)
-              .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
-            if (!absorbedWorldNodes.length) {
-              alert(`"${selectedUniverseName}" no tiene absorciones activas.`);
-              return;
-            }
-
-            const worldPromptMessage = [
-              `Elige el mundo que quieres liberar de "${selectedUniverseName}":`,
-              ...absorbedWorldNodes.map((node, idx) => `${idx + 1}. ${node.name}`)
-            ].join('\n');
-            const worldSelection = window.prompt(worldPromptMessage, absorbedWorldNodes[0]?.name || '');
-            if (worldSelection === null) return;
-
-            const normalizedWorldSelection = normalizeUniverseName(worldSelection);
-            const selectedWorldByIndex = Number.parseInt(worldSelection, 10);
-            const selectedWorldNode = Number.isInteger(selectedWorldByIndex)
-              && selectedWorldByIndex >= 1
-              && selectedWorldByIndex <= absorbedWorldNodes.length
-              ? absorbedWorldNodes[selectedWorldByIndex - 1]
-              : absorbedWorldNodes.find((node) => normalizeUniverseName(node.name) === normalizedWorldSelection);
-
-            if (!selectedWorldNode) {
-              alert('No se reconoció ese mundo. Intenta de nuevo con el nombre o número de la lista.');
-              return;
-            }
-
-            const remainingParentIds = getParentUniverseIdsForNode(selectedWorldNode)
-              .filter((parentId) => parentId !== selectedUniverseNode.id);
-            const nextPrimaryParentId = remainingParentIds[0] || '';
-
-            if (nextPrimaryParentId) {
-              state.universeMemberships[selectedWorldNode.id] = nextPrimaryParentId;
-            } else {
-              delete state.universeMemberships[selectedWorldNode.id];
-            }
-
-            state.universeNodes = (state.universeNodes || []).map((node) => {
-              if (node.id !== selectedWorldNode.id) return node;
-              const normalizedParentIds = nextPrimaryParentId
-                ? [nextPrimaryParentId, ...remainingParentIds.filter((id) => id !== nextPrimaryParentId)]
-                : remainingParentIds;
-              return {
-                ...node,
-                kind: normalizedParentIds.length ? 'world' : 'universe',
-                parentUniverseId: nextPrimaryParentId,
-                parentUniverseIds: normalizedParentIds
-              };
-            });
-            state.mapAbsorptionEffect = null;
-            saveUniverseMemberships();
-            saveUniverseNodes();
-            renderMapView();
-            return;
-          }
-
           const worldEl = event.target.closest('.universe-node--world');
           if (worldEl) {
             event.preventDefault();
