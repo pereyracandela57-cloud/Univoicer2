@@ -941,7 +941,79 @@
       }
     }
 
+    function deduplicateUniverseNodesAndMemberships() {
+      const nameToNodeIndex = new Map();
+      const remappedNodeIds = {};
+      const dedupedNodes = [];
+
+      state.universeNodes.forEach((rawNode) => {
+        const node = rawNode && typeof rawNode === 'object' ? { ...rawNode } : null;
+        if (!node) return;
+        const normalizedName = normalizeUniverseName(node.name);
+        if (!normalizedName) return;
+        const existingIndex = nameToNodeIndex.get(normalizedName);
+        if (existingIndex === undefined) {
+          nameToNodeIndex.set(normalizedName, dedupedNodes.length);
+          dedupedNodes.push(node);
+          return;
+        }
+        const primaryNode = dedupedNodes[existingIndex];
+        if (node.id && node.id !== primaryNode.id) {
+          remappedNodeIds[node.id] = primaryNode.id;
+        }
+        if (!primaryNode.cover && node.cover) primaryNode.cover = node.cover;
+        if (node.kind === 'world') primaryNode.kind = 'world';
+        const mergedParents = [...new Set([
+          ...getParentUniverseIdsForNode(primaryNode),
+          ...getParentUniverseIdsForNode(node)
+        ])];
+        primaryNode.parentUniverseIds = mergedParents;
+        if (!primaryNode.parentUniverseId && node.parentUniverseId) {
+          primaryNode.parentUniverseId = node.parentUniverseId;
+        }
+        primaryNode.neighbors = [...new Set([...(primaryNode.neighbors || []), ...(node.neighbors || [])])];
+      });
+
+      if (!Object.keys(remappedNodeIds).length) {
+        state.universeNodes = dedupedNodes;
+        return;
+      }
+
+      const remapId = (value) => {
+        const cleanId = String(value || '').trim();
+        return remappedNodeIds[cleanId] || cleanId;
+      };
+
+      state.universeNodes = dedupedNodes.map((node) => {
+        const parentIds = getParentUniverseIdsForNode(node)
+          .map(remapId)
+          .filter((id, index, list) => id && id !== node.id && list.indexOf(id) === index);
+        const primaryParentId = remapId(node.parentUniverseId || '');
+        const mergedParentIds = primaryParentId
+          ? [primaryParentId, ...parentIds.filter((id) => id !== primaryParentId)]
+          : parentIds;
+        return {
+          ...node,
+          neighbors: (node.neighbors || [])
+            .map(remapId)
+            .filter((neighborId, index, list) => neighborId && neighborId !== node.id && list.indexOf(neighborId) === index),
+          parentUniverseId: mergedParentIds[0] || '',
+          parentUniverseIds: mergedParentIds
+        };
+      });
+
+      const remappedMemberships = {};
+      Object.entries(state.universeMemberships || {}).forEach(([childId, parentId]) => {
+        const nextChildId = remapId(childId);
+        const nextParentId = remapId(parentId);
+        if (!nextChildId || !nextParentId || nextChildId === nextParentId) return;
+        remappedMemberships[nextChildId] = nextParentId;
+      });
+      state.universeMemberships = remappedMemberships;
+    }
+
     function sanitizeUniverseMembershipsAndPersist() {
+      deduplicateUniverseNodesAndMemberships();
       const sanitizedMemberships = normalizeUniverseMemberships(state.universeMemberships);
       const changed = JSON.stringify(sanitizedMemberships) !== JSON.stringify(state.universeMemberships || {});
       state.universeMemberships = sanitizedMemberships;
