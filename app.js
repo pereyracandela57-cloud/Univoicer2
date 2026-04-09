@@ -1440,15 +1440,12 @@
       const twistDirection = (hash & 1) ? 1 : -1;
       const sway = 6 + ((hash >> 6) % 18);
       const width = (2.6 + (((hash >> 4) % 14) / 10)).toFixed(2);
-      const dashA = 24 + ((hash >> 2) % 24);
-      const dashB = 12 + ((hash >> 5) % 18);
       return {
         curveStrength: Number(curveStrength.toFixed(3)),
         arcBias: Number(arcBias.toFixed(3)),
         twistDirection,
         sway,
-        width,
-        dashPattern: `${dashA} ${dashB}`
+        width
       };
     }
 
@@ -1628,12 +1625,13 @@
         pathEl.setAttribute('d', path);
       };
 
-      const updateExpandedWorldsForParent = (parentNodeId) => {
-        if (!parentNodeId || !state.expandedUniverses.has(parentNodeId)) return;
-        const parentNode = state.universeNodes.find((item) => item.id === parentNodeId);
-        if (!parentNode) return;
-        const worldEls = [...viewMap.querySelectorAll(`.universe-node--world[data-parent-id="${parentNodeId}"]`)];
+      const updateVisibleWorldConnectors = () => {
+        const worldEls = [...viewMap.querySelectorAll('.universe-node--world[data-parent-id]')];
         worldEls.forEach((worldEl) => {
+          const parentNodeId = worldEl.dataset.parentId || '';
+          if (!parentNodeId || !state.expandedUniverses.has(parentNodeId)) return;
+          const parentNode = state.universeNodes.find((item) => item.id === parentNodeId);
+          if (!parentNode) return;
           const baseAngle = Number.parseFloat(worldEl.dataset.baseAngle || '0');
           const baseDx = Number.parseFloat(worldEl.dataset.baseDx || '');
           const baseDy = Number.parseFloat(worldEl.dataset.baseDy || '');
@@ -1651,6 +1649,17 @@
           const worldKey = worldEl.dataset.worldKey || '';
           const pathEl = viewMap.querySelector(`.map-link-path[data-parent-id="${parentNodeId}"][data-world-key="${worldKey}"]`);
           updateConnectorPath(pathEl, parentNode.x, parentNode.y, targetCenterX, targetCenterY, baseAngle);
+          const secondaryPathEls = [
+            ...viewMap.querySelectorAll(`.map-link-path--secondary[data-source-world-key="${worldKey}"]`)
+          ];
+          secondaryPathEls.forEach((secondaryPathEl) => {
+            const secondaryParentId = secondaryPathEl.dataset.secondaryParentId || '';
+            if (!secondaryParentId) return;
+            const secondaryParent = state.universeNodes.find((item) => item.id === secondaryParentId);
+            if (!secondaryParent) return;
+            const bridgeAngle = Math.atan2(secondaryParent.y - targetCenterY, secondaryParent.x - targetCenterX);
+            updateConnectorPath(secondaryPathEl, targetCenterX, targetCenterY, secondaryParent.x, secondaryParent.y, bridgeAngle);
+          });
         });
       };
 
@@ -1725,7 +1734,7 @@
                   data-arc-bias="${connectorVariant.arcBias}"
                   data-twist-direction="${connectorVariant.twistDirection}"
                   data-sway="${connectorVariant.sway}"
-                  style="--link-width:${connectorVariant.width}; --dash-pattern:${connectorVariant.dashPattern};"
+                  style="--link-width:${connectorVariant.width};"
                   d="${connectorPath}"
                 ></path>
               `);
@@ -1747,7 +1756,13 @@
                   <path
                     class="map-link-path map-link-path--secondary"
                     data-parent-id="${node.id}"
+                    data-source-world-key="${entry.worldKey}"
+                    data-secondary-parent-id="${secondaryParentId}"
                     data-world-key="${entry.worldKey}:secondary:${secondaryParentId}"
+                    data-curve-strength="${Math.max(0.12, bridgeVariant.curveStrength * 0.75)}"
+                    data-arc-bias="${Math.max(0.16, bridgeVariant.arcBias * 0.7)}"
+                    data-twist-direction="${bridgeVariant.twistDirection}"
+                    data-sway="${Math.max(2, Math.round(bridgeVariant.sway * 0.5))}"
                     d="${bridgePath}"
                   ></path>
                 `);
@@ -1963,7 +1978,7 @@
           node.y = boundedY;
           nodeEl.style.left = `${boundedX - NODE_HALF_WIDTH}px`;
           nodeEl.style.top = `${boundedY - NODE_HALF_HEIGHT}px`;
-          updateExpandedWorldsForParent(node.id);
+          updateVisibleWorldConnectors();
           const movedDistance = Math.hypot(event.clientX - mapViewRuntime.dragState.startClientX, event.clientY - mapViewRuntime.dragState.startClientY);
           if (!mapViewRuntime.dragState.moved && movedDistance >= DRAG_OPEN_THRESHOLD) {
             mapViewRuntime.dragState.moved = true;

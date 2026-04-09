@@ -482,22 +482,23 @@
 
     .map-link-path {
       fill: none;
-      stroke: #38c6ff;
-      stroke-width: var(--link-width, 3.2);
+      stroke: rgba(72, 198, 255, .98);
+      stroke-width: var(--link-width, 3.4);
       stroke-linecap: round;
-      stroke-dasharray: var(--dash-pattern, none);
-      filter: none;
-      opacity: .94;
-      animation: none;
+      stroke-linejoin: round;
+      stroke-dasharray: none;
+      filter: drop-shadow(0 0 4px rgba(110, 219, 255, .82)) drop-shadow(0 0 12px rgba(56, 198, 255, .62));
+      opacity: .98;
+      animation: connectorGlow 1.8s ease-in-out infinite alternate;
     }
 
     .map-link-path--secondary {
-      stroke: rgba(255, 56, 56, .96);
-      stroke-width: 2.1;
-      stroke-dasharray: 9 7;
-      filter: none;
-      opacity: .98;
-      animation: none;
+      stroke: rgba(255, 78, 78, .98);
+      stroke-width: 2.8;
+      stroke-dasharray: none;
+      filter: drop-shadow(0 0 4px rgba(255, 102, 102, .9)) drop-shadow(0 0 14px rgba(255, 66, 66, .7));
+      opacity: 1;
+      animation: connectorGlow 1.4s ease-in-out infinite alternate;
     }
 
     @keyframes connectorGlow {
