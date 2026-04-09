@@ -1575,6 +1575,15 @@
         startClientY: 0,
         moved: false,
         activeNodeElement: null
+      },
+      toolDragState: {
+        active: false,
+        tool: '',
+        pointerId: null,
+        tokenEl: null,
+        targetNodeId: '',
+        targetType: '',
+        targetParentId: ''
       }
     };
 
@@ -1588,7 +1597,9 @@
         viewMap.innerHTML = `
           <div class="universe-map-shell">
             <div class="map-toolbar">
-              <button type="button" id="undoAllAbsorptions" class="neon-btn map-reset-btn" aria-label="Explosión Big Bang">💥 Explosión Big Bang</button>
+              <button type="button" id="undoAllAbsorptions" class="neon-btn map-reset-btn" aria-label="Explosión Big Bang clásica">💥 Explosión Big Bang</button>
+              <button type="button" class="neon-btn map-tool-btn map-tool-btn--bigbang" data-map-tool="bigbang" aria-label="Herramienta Big Bang">💥 Big Bang</button>
+              <button type="button" class="neon-btn map-tool-btn map-tool-btn--blackhole" data-map-tool="blackhole" aria-label="Herramienta Agujero negro">🕳️ Agujero negro</button>
             </div>
             <div id="universeMapCanvas" aria-label="Mapa de universos explorable">
               <div class="map-nebula-layer" aria-hidden="true"></div>
@@ -1695,12 +1706,149 @@
         mapViewRuntime.dragState.activeNodeElement = null;
       };
 
+      const resetToolDragState = ({ removeToken = true } = {}) => {
+        mapViewRuntime.toolDragState.active = false;
+        mapViewRuntime.toolDragState.tool = '';
+        mapViewRuntime.toolDragState.pointerId = null;
+        mapViewRuntime.toolDragState.targetNodeId = '';
+        mapViewRuntime.toolDragState.targetType = '';
+        mapViewRuntime.toolDragState.targetParentId = '';
+        if (removeToken && mapViewRuntime.toolDragState.tokenEl) {
+          mapViewRuntime.toolDragState.tokenEl.remove();
+        }
+        mapViewRuntime.toolDragState.tokenEl = null;
+        viewMap.classList.remove('map-tool-active');
+      };
+
       const updateDragTargetHighlight = (activeNodeId = '', targetNodeId = '') => {
         viewMap.querySelectorAll('.universe-node').forEach((nodeEl) => {
           const nodeId = nodeEl.dataset.nodeId || '';
           nodeEl.classList.toggle('is-dragging', Boolean(activeNodeId) && nodeId === activeNodeId);
           nodeEl.classList.toggle('is-drop-target', Boolean(targetNodeId) && nodeId === targetNodeId);
         });
+      };
+
+      const updateToolDropTargetHighlight = (tool = '', targetNodeId = '', targetType = '', targetParentId = '') => {
+        viewMap.querySelectorAll('.universe-node').forEach((nodeEl) => {
+          const nodeId = nodeEl.dataset.nodeId || nodeEl.dataset.worldId || '';
+          const isWorld = nodeEl.classList.contains('universe-node--world');
+          const isTarget = targetNodeId && nodeId === targetNodeId
+            && ((!isWorld && targetType === 'universe') || (isWorld && targetType === 'world'))
+            && (!isWorld || (nodeEl.dataset.parentId || '') === (targetParentId || ''));
+          nodeEl.classList.toggle('is-tool-target', Boolean(isTarget));
+          nodeEl.classList.toggle('is-tool-target--danger', Boolean(isTarget) && tool === 'blackhole');
+        });
+      };
+
+      const getToolDropTargetFromPoint = (clientX, clientY) => {
+        const hovered = document.elementFromPoint(clientX, clientY);
+        if (!hovered) return null;
+        const worldEl = hovered.closest('.universe-node--world[data-world-id]');
+        if (worldEl) {
+          return {
+            type: 'world',
+            nodeId: worldEl.dataset.worldId || '',
+            parentId: worldEl.dataset.parentId || ''
+          };
+        }
+        const universeEl = hovered.closest('.universe-node--universe[data-node-id]');
+        if (universeEl) {
+          return {
+            type: 'universe',
+            nodeId: universeEl.dataset.nodeId || '',
+            parentId: ''
+          };
+        }
+        return null;
+      };
+
+      const releaseWorldFromParent = (worldId, parentId) => {
+        const worldNode = state.universeNodes.find((node) => node.id === worldId);
+        if (!worldNode) return false;
+        const parentIds = getParentUniverseIdsForNode(worldNode);
+        if (!parentIds.includes(parentId)) return false;
+        const remainingParentIds = parentIds.filter((id) => id !== parentId);
+        const nextPrimaryParentId = remainingParentIds[0] || '';
+        if (nextPrimaryParentId) state.universeMemberships[worldId] = nextPrimaryParentId;
+        else delete state.universeMemberships[worldId];
+        worldNode.parentUniverseId = nextPrimaryParentId;
+        worldNode.parentUniverseIds = remainingParentIds;
+        worldNode.kind = remainingParentIds.length ? 'world' : 'universe';
+        return true;
+      };
+
+      const releaseAllWorldsFromUniverse = (parentUniverseId) => {
+        let changed = false;
+        state.universeNodes.forEach((node) => {
+          if (!node || node.id === parentUniverseId) return;
+          const parentIds = getParentUniverseIdsForNode(node);
+          if (!parentIds.includes(parentUniverseId)) return;
+          const remainingParentIds = parentIds.filter((id) => id !== parentUniverseId);
+          const nextPrimaryParentId = remainingParentIds[0] || '';
+          if (nextPrimaryParentId) state.universeMemberships[node.id] = nextPrimaryParentId;
+          else delete state.universeMemberships[node.id];
+          node.parentUniverseId = nextPrimaryParentId;
+          node.parentUniverseIds = remainingParentIds;
+          node.kind = remainingParentIds.length ? 'world' : 'universe';
+          changed = true;
+        });
+        return changed;
+      };
+
+      const deleteUniverseNode = (nodeId) => {
+        const nodeToDelete = state.universeNodes.find((node) => node.id === nodeId);
+        if (!nodeToDelete) return false;
+        delete state.universeMemberships[nodeId];
+        state.universeNodes = state.universeNodes.filter((node) => node.id !== nodeId);
+        Object.entries({ ...(state.universeMemberships || {}) }).forEach(([childId, parentId]) => {
+          if (parentId !== nodeId) return;
+          const childNode = state.universeNodes.find((node) => node.id === childId);
+          if (!childNode) {
+            delete state.universeMemberships[childId];
+            return;
+          }
+          const remainingParentIds = getParentUniverseIdsForNode(childNode).filter((id) => id !== nodeId);
+          const nextPrimaryParentId = remainingParentIds[0] || '';
+          if (nextPrimaryParentId) state.universeMemberships[childId] = nextPrimaryParentId;
+          else delete state.universeMemberships[childId];
+          childNode.parentUniverseId = nextPrimaryParentId;
+          childNode.parentUniverseIds = remainingParentIds;
+          childNode.kind = remainingParentIds.length ? 'world' : 'universe';
+        });
+        state.universeNodes.forEach((node) => {
+          if (!node || node.id === nodeId) return;
+          const nextParentIds = getParentUniverseIdsForNode(node).filter((id) => id !== nodeId);
+          const nextPrimaryParentId = nextParentIds[0] || '';
+          if (nextPrimaryParentId) state.universeMemberships[node.id] = nextPrimaryParentId;
+          else delete state.universeMemberships[node.id];
+          node.parentUniverseId = nextPrimaryParentId;
+          node.parentUniverseIds = nextParentIds;
+          node.kind = nextParentIds.length ? 'world' : 'universe';
+        });
+        state.expandedUniverses.delete(nodeId);
+        if (state.universe && normalizeUniverseName(state.universe) === normalizeUniverseName(nodeToDelete.name)) {
+          state.universe = null;
+          state.selectedVideoId = null;
+          if (state.view === 'universe') changeView('map');
+        }
+        return true;
+      };
+
+      const applyMapToolDrop = (tool, target) => {
+        if (!tool || !target?.nodeId) return false;
+        if (tool === 'bigbang') {
+          if (target.type === 'world') {
+            return releaseWorldFromParent(target.nodeId, target.parentId);
+          }
+          if (target.type === 'universe') {
+            return releaseAllWorldsFromUniverse(target.nodeId);
+          }
+          return false;
+        }
+        if (tool === 'blackhole') {
+          return deleteUniverseNode(target.nodeId);
+        }
+        return false;
       };
 
       const updateConnectorPath = (pathEl, startX, startY, endX, endY, angle) => {
@@ -1811,6 +1959,7 @@
               const safeX = Math.round(worldX - WORLD_NODE_HALF_WIDTH);
               const safeY = Math.round(worldY - WORLD_NODE_HALF_HEIGHT);
               const safeWorldName = escapeHtml(entry.name);
+              const worldNodeId = entry.id || state.universeNodes.find((item) => normalizeUniverseName(item.name) === normalizeUniverseName(entry.name))?.id || '';
               const floatDelay = ((Math.abs(hashCode(`${entry.id || entry.name}-${index}`)) % 24) / 10).toFixed(1);
               const worldCenterX = worldX;
               const worldCenterY = worldY;
@@ -1864,6 +2013,7 @@
               worldNodes.push(`
                 <button
                   class="universe-node universe-node--world"
+                  data-world-id="${worldNodeId}"
                   data-world-name="${safeWorldName}"
                   data-world-type="${entry.type}"
                   data-world-key="${entry.worldKey}"
@@ -2032,8 +2182,30 @@
         }, true);
 
         viewMap.addEventListener('pointerdown', (event) => {
+          const toolBtn = event.target.closest('[data-map-tool]');
+          if (toolBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const tool = toolBtn.dataset.mapTool || '';
+            if (!tool) return;
+            resetToolDragState();
+            const token = document.createElement('div');
+            token.className = `map-tool-token map-tool-token--${tool}`;
+            token.setAttribute('aria-hidden', 'true');
+            token.textContent = tool === 'blackhole' ? '🕳️' : '💥';
+            token.style.left = `${event.clientX}px`;
+            token.style.top = `${event.clientY}px`;
+            document.body.appendChild(token);
+            mapViewRuntime.toolDragState.active = true;
+            mapViewRuntime.toolDragState.tool = tool;
+            mapViewRuntime.toolDragState.pointerId = event.pointerId;
+            mapViewRuntime.toolDragState.tokenEl = token;
+            viewMap.classList.add('map-tool-active');
+            return;
+          }
           const nodeEl = event.target.closest('.universe-node--universe');
           if (!nodeEl) return;
+          if (mapViewRuntime.toolDragState.active) return;
           if (event.button !== 0) return;
           const nodeId = nodeEl.dataset.nodeId || '';
           const node = state.universeNodes.find(item => item.id === nodeId);
@@ -2056,6 +2228,25 @@
         });
 
         viewMap.addEventListener('pointermove', (event) => {
+          if (mapViewRuntime.toolDragState.active && mapViewRuntime.toolDragState.pointerId === event.pointerId) {
+            event.preventDefault();
+            const tokenEl = mapViewRuntime.toolDragState.tokenEl;
+            if (tokenEl) {
+              tokenEl.style.left = `${event.clientX}px`;
+              tokenEl.style.top = `${event.clientY}px`;
+            }
+            const target = getToolDropTargetFromPoint(event.clientX, event.clientY);
+            mapViewRuntime.toolDragState.targetNodeId = target?.nodeId || '';
+            mapViewRuntime.toolDragState.targetType = target?.type || '';
+            mapViewRuntime.toolDragState.targetParentId = target?.parentId || '';
+            updateToolDropTargetHighlight(
+              mapViewRuntime.toolDragState.tool,
+              mapViewRuntime.toolDragState.targetNodeId,
+              mapViewRuntime.toolDragState.targetType,
+              mapViewRuntime.toolDragState.targetParentId
+            );
+            return;
+          }
           if (mapViewRuntime.dragState.pointerId !== event.pointerId) return;
           if (!mapViewRuntime.dragState.activeNodeId) return;
           const nodeEl = mapViewRuntime.dragState.activeNodeElement;
@@ -2084,6 +2275,23 @@
         });
 
         const finishDrag = (event) => {
+          if (mapViewRuntime.toolDragState.active && mapViewRuntime.toolDragState.pointerId === event.pointerId) {
+            event.preventDefault();
+            const target = {
+              nodeId: mapViewRuntime.toolDragState.targetNodeId,
+              type: mapViewRuntime.toolDragState.targetType,
+              parentId: mapViewRuntime.toolDragState.targetParentId
+            };
+            const changed = applyMapToolDrop(mapViewRuntime.toolDragState.tool, target);
+            updateToolDropTargetHighlight();
+            resetToolDragState();
+            if (changed) {
+              saveUniverseMemberships();
+              saveUniverseNodes();
+              renderMapView({ rebuildWorld: true });
+            }
+            return;
+          }
           if (mapViewRuntime.dragState.pointerId !== event.pointerId) return;
           if (!mapViewRuntime.dragState.activeNodeId) return;
           const nodeEl = mapViewRuntime.dragState.activeNodeElement;
