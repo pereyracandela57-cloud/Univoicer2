@@ -491,7 +491,7 @@
         drop-shadow(0 0 11px rgba(67, 166, 255, .95))
         drop-shadow(0 0 22px rgba(53, 136, 255, .68));
       opacity: .94;
-      animation: connectorGlow 1.9s ease-in-out infinite alternate, connectorFlow 5.6s linear infinite;
+      animation: none;
     }
 
     .map-link-path--secondary {
@@ -503,7 +503,7 @@
         drop-shadow(0 0 12px rgba(255, 64, 64, .85))
         drop-shadow(0 0 20px rgba(255, 24, 24, .68));
       opacity: .98;
-      animation: connectorGlow 1.2s ease-in-out infinite alternate, connectorFlow 1.8s linear infinite;
+      animation: none;
     }
 
     @keyframes connectorGlow {
@@ -586,7 +586,7 @@
       display: flex;
       flex-direction: column;
       align-items: center;
-      animation: nodeFloat 5.8s ease-in-out infinite;
+      animation: none;
       animation-delay: var(--float-delay, 0s);
       transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
       min-height: 0;
@@ -2863,7 +2863,7 @@
       transform-style: preserve-3d;
       transform: translateY(0) scale(1);
       transition: transform .26s ease, box-shadow .3s ease, border-color .25s ease, filter .25s ease;
-      animation: cardFloat 5.2s ease-in-out infinite;
+      animation: none;
       animation-delay: var(--float-delay);
     }
     .character-gallery-card::before {
@@ -3033,7 +3033,7 @@
       background-size: 150% 150%, 150% 150%, 100% 100%, 100% 6px;
       mix-blend-mode: screen;
       opacity: .9;
-      animation: lockedNebulaShift 14s ease-in-out infinite alternate;
+      animation: none;
     }
     .character-gallery-card[data-locked="true"] .character-gallery-media--image {
       filter: grayscale(1) brightness(.08) contrast(1.9) saturate(.7) drop-shadow(0 0 10px var(--locked-glow));
@@ -3088,6 +3088,21 @@
       0%, 100% { transform: translateY(0); }
       50% { transform: translateY(-6px); }
     }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+
+      html:focus-within,
+      .universe-map-shell {
+        scroll-behavior: auto;
+      }
+    }
+
     .character-preview-popover {
       position: fixed;
       width: min(420px, calc(100vw - 28px));
