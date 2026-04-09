@@ -1792,7 +1792,11 @@
         offsetY: 0,
         startClientX: 0,
         startClientY: 0,
-        moved: false
+        moved: false,
+        latestMove: null,
+        frameRequestId: 0,
+        highlightedActiveNodeId: '',
+        highlightedTargetNodeId: ''
       };
       const DRAG_OPEN_THRESHOLD = 8;
       const DROP_TARGET_PROXIMITY = 190;
@@ -1805,6 +1809,9 @@
         };
       };
       const resetDragState = () => {
+        if (dragState.frameRequestId) {
+          window.cancelAnimationFrame(dragState.frameRequestId);
+        }
         dragState.activeNodeId = '';
         dragState.targetNodeId = '';
         dragState.pointerId = null;
@@ -1813,14 +1820,24 @@
         dragState.startClientX = 0;
         dragState.startClientY = 0;
         dragState.moved = false;
+        dragState.latestMove = null;
+        dragState.frameRequestId = 0;
       };
 
       const updateDragTargetHighlight = (activeNodeId = '', targetNodeId = '') => {
+        if (
+          dragState.highlightedActiveNodeId === activeNodeId &&
+          dragState.highlightedTargetNodeId === targetNodeId
+        ) {
+          return;
+        }
         viewMap.querySelectorAll('.universe-node').forEach((nodeEl) => {
           const nodeId = nodeEl.dataset.nodeId || '';
           nodeEl.classList.toggle('is-dragging', Boolean(activeNodeId) && nodeId === activeNodeId);
           nodeEl.classList.toggle('is-drop-target', Boolean(targetNodeId) && nodeId === targetNodeId);
         });
+        dragState.highlightedActiveNodeId = activeNodeId;
+        dragState.highlightedTargetNodeId = targetNodeId;
       };
 
       const updateConnectorPath = (pathEl, startX, startY, endX, endY, angle) => {
@@ -1883,6 +1900,51 @@
         return best?.node || null;
       };
 
+      const processDragMoveFrame = () => {
+        dragState.frameRequestId = 0;
+        const move = dragState.latestMove;
+        if (!move) return;
+        dragState.latestMove = null;
+        if (dragState.pointerId !== move.pointerId) return;
+        if (!dragState.activeNodeId) return;
+        if (!mapShell) return;
+        const node = state.universeNodes.find(item => item.id === dragState.activeNodeId);
+        if (!node) return;
+        const rawX = move.worldX - dragState.offsetX;
+        const rawY = move.worldY - dragState.offsetY;
+        const boundedX = Math.max(NODE_HALF_WIDTH, Math.min(Math.round(rawX), state.mapCanvas.width - NODE_HALF_WIDTH));
+        const boundedY = Math.max(NODE_HALF_HEIGHT, Math.min(Math.round(rawY), state.mapCanvas.height - NODE_HALF_HEIGHT));
+        node.x = boundedX;
+        node.y = boundedY;
+        move.nodeEl.style.left = `${boundedX - NODE_HALF_WIDTH}px`;
+        move.nodeEl.style.top = `${boundedY - NODE_HALF_HEIGHT}px`;
+        updateExpandedWorldsForParent(node.id);
+        const movedDistance = Math.hypot(move.clientX - dragState.startClientX, move.clientY - dragState.startClientY);
+        if (!dragState.moved && movedDistance >= DRAG_OPEN_THRESHOLD) {
+          dragState.moved = true;
+          move.nodeEl.dataset.dragMoved = '1';
+        }
+        const targetNode = findDropTargetForNode(node);
+        dragState.targetNodeId = targetNode?.id || '';
+        updateDragTargetHighlight(dragState.activeNodeId, dragState.targetNodeId);
+      };
+
+      const scheduleDragMoveFrame = () => {
+        if (dragState.frameRequestId) return;
+        dragState.frameRequestId = window.requestAnimationFrame(() => {
+          processDragMoveFrame();
+        });
+      };
+
+      const flushPendingDragMove = () => {
+        if (!dragState.latestMove) return;
+        if (dragState.frameRequestId) {
+          window.cancelAnimationFrame(dragState.frameRequestId);
+          dragState.frameRequestId = 0;
+        }
+        processDragMoveFrame();
+      };
+
       viewMap.querySelectorAll('.universe-node').forEach(nodeEl => {
         const coverEl = nodeEl.querySelector('.universe-cover');
         coverEl?.addEventListener('error', () => {
@@ -1913,32 +1975,22 @@
         nodeEl.addEventListener('pointermove', (event) => {
           if (dragState.pointerId !== event.pointerId) return;
           if (!dragState.activeNodeId) return;
-          if (!mapShell) return;
-          const node = state.universeNodes.find(item => item.id === dragState.activeNodeId);
-          if (!node) return;
           event.preventDefault();
           const worldPoint = toWorldPoint(event);
-          const rawX = worldPoint.x - dragState.offsetX;
-          const rawY = worldPoint.y - dragState.offsetY;
-          const boundedX = Math.max(NODE_HALF_WIDTH, Math.min(Math.round(rawX), state.mapCanvas.width - NODE_HALF_WIDTH));
-          const boundedY = Math.max(NODE_HALF_HEIGHT, Math.min(Math.round(rawY), state.mapCanvas.height - NODE_HALF_HEIGHT));
-          node.x = boundedX;
-          node.y = boundedY;
-          nodeEl.style.left = `${boundedX - NODE_HALF_WIDTH}px`;
-          nodeEl.style.top = `${boundedY - NODE_HALF_HEIGHT}px`;
-          updateExpandedWorldsForParent(node.id);
-          const movedDistance = Math.hypot(event.clientX - dragState.startClientX, event.clientY - dragState.startClientY);
-          if (!dragState.moved && movedDistance >= DRAG_OPEN_THRESHOLD) {
-            dragState.moved = true;
-            nodeEl.dataset.dragMoved = '1';
-          }
-          const targetNode = findDropTargetForNode(node);
-          dragState.targetNodeId = targetNode?.id || '';
-          updateDragTargetHighlight(dragState.activeNodeId, dragState.targetNodeId);
+          dragState.latestMove = {
+            pointerId: event.pointerId,
+            clientX: event.clientX,
+            clientY: event.clientY,
+            worldX: worldPoint.x,
+            worldY: worldPoint.y,
+            nodeEl
+          };
+          scheduleDragMoveFrame();
         });
         const finishDrag = (event) => {
           if (dragState.pointerId !== event.pointerId) return;
           if (!dragState.activeNodeId) return;
+          flushPendingDragMove();
           const activeNodeId = dragState.activeNodeId;
           const targetNodeId = dragState.targetNodeId;
           if (nodeEl.hasPointerCapture(event.pointerId)) {
