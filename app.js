@@ -2196,30 +2196,55 @@
               alert('No se pudo encontrar el universo seleccionado.');
               return;
             }
-            let dissolutions = 0;
-            const nextMemberships = {};
-            Object.entries(currentMemberships).forEach(([childId, parentId]) => {
-              if (String(parentId || '') === selectedUniverseNode.id) {
-                dissolutions += 1;
-                return;
-              }
-              nextMemberships[childId] = parentId;
-            });
-            if (!dissolutions) {
+            const absorbedWorldNodes = Object.entries(currentMemberships)
+              .filter(([, parentId]) => String(parentId || '') === selectedUniverseNode.id)
+              .map(([childId]) => state.universeNodes.find((node) => node.id === childId))
+              .filter((node) => node?.name)
+              .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+            if (!absorbedWorldNodes.length) {
               alert(`"${selectedUniverseName}" no tiene absorciones activas.`);
               return;
             }
-            state.universeMemberships = nextMemberships;
+
+            const worldPromptMessage = [
+              `Elige el mundo que quieres liberar de "${selectedUniverseName}":`,
+              ...absorbedWorldNodes.map((node, idx) => `${idx + 1}. ${node.name}`)
+            ].join('\n');
+            const worldSelection = window.prompt(worldPromptMessage, absorbedWorldNodes[0]?.name || '');
+            if (worldSelection === null) return;
+
+            const normalizedWorldSelection = normalizeUniverseName(worldSelection);
+            const selectedWorldByIndex = Number.parseInt(worldSelection, 10);
+            const selectedWorldNode = Number.isInteger(selectedWorldByIndex)
+              && selectedWorldByIndex >= 1
+              && selectedWorldByIndex <= absorbedWorldNodes.length
+              ? absorbedWorldNodes[selectedWorldByIndex - 1]
+              : absorbedWorldNodes.find((node) => normalizeUniverseName(node.name) === normalizedWorldSelection);
+
+            if (!selectedWorldNode) {
+              alert('No se reconoció ese mundo. Intenta de nuevo con el nombre o número de la lista.');
+              return;
+            }
+
+            const remainingParentIds = getParentUniverseIdsForNode(selectedWorldNode)
+              .filter((parentId) => parentId !== selectedUniverseNode.id);
+            const nextPrimaryParentId = remainingParentIds[0] || '';
+
+            if (nextPrimaryParentId) {
+              state.universeMemberships[selectedWorldNode.id] = nextPrimaryParentId;
+            } else {
+              delete state.universeMemberships[selectedWorldNode.id];
+            }
+
             state.universeNodes = (state.universeNodes || []).map((node) => {
-              const parentId = state.universeMemberships[node.id] || '';
-              const parentIds = getParentUniverseIdsForNode(node).filter((item) => item !== selectedUniverseNode.id);
-              const normalizedParentIds = parentId
-                ? [parentId, ...parentIds.filter((item) => item !== parentId)]
-                : parentIds;
+              if (node.id !== selectedWorldNode.id) return node;
+              const normalizedParentIds = nextPrimaryParentId
+                ? [nextPrimaryParentId, ...remainingParentIds.filter((id) => id !== nextPrimaryParentId)]
+                : remainingParentIds;
               return {
                 ...node,
                 kind: normalizedParentIds.length ? 'world' : 'universe',
-                parentUniverseId: parentId,
+                parentUniverseId: nextPrimaryParentId,
                 parentUniverseIds: normalizedParentIds
               };
             });
