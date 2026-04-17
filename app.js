@@ -55,7 +55,7 @@
       blockedCharactersByActor: {},
       characterProfileId: null,
       indiceSearch: '',
-      indiceFilters: { universe: 'todos', actor: 'todos' },
+      indiceFilters: { universe: 'todos', actor: 'todos', role: 'todos', roleCategory: 'todos' },
       indiceCharacterFocus: null,
       showAddCharacterForm: false,
       draftCharacterActors: [],
@@ -5114,21 +5114,40 @@
       const normalizedSearch = normalizeName(searchTerm || '');
       const selectedUniverse = normalizeUniverseName(state.indiceFilters?.universe || 'todos');
       const selectedActor = normalizeName(state.indiceFilters?.actor || 'todos');
+      const selectedRole = normalizeRole(state.indiceFilters?.role || 'todos');
+      const selectedRoleCategory = normalizeRoleCategory(state.indiceFilters?.roleCategory || 'todos');
       return [...grouped.values()]
         .map((item) => {
           const { unlockedByActor, blockedActors } = getCharacterActorsForIndice(item.name);
           const universes = getCharacterUniverseList(item.name, { fallbackToUnassigned: false });
           const unlockedVersion = item.versions.find(video => hasGreetingVideo(video));
-          const sourceVersion = unlockedVersion || item.versions[0] || null;
-          const role = normalizeRole(sourceVersion?.rol || sourceVersion?.role);
-          const roleCategory = normalizeRoleCategory(sourceVersion?.categoriaRol || sourceVersion?.roleCategory);
+          let representativeRole = '';
+          let representativeRoleCategory = '';
+          let maxRepresentativeRoleRank = -1;
+          item.versions.forEach((video) => {
+            const { rol, categoriaRol } = getVideoRoleCategory(video);
+            const currentRank = roleRank(rol, categoriaRol);
+            if (currentRank > maxRepresentativeRoleRank) {
+              maxRepresentativeRoleRank = currentRank;
+              representativeRole = rol;
+              representativeRoleCategory = categoriaRol;
+            }
+          });
+          if (!representativeRole && !representativeRoleCategory) {
+            const sourceVersion = unlockedVersion || item.versions[0] || null;
+            representativeRole = sourceVersion?.rol || sourceVersion?.role || '';
+            representativeRoleCategory = sourceVersion?.categoriaRol || sourceVersion?.roleCategory || '';
+          }
           return {
             ...item,
             actorCount: unlockedByActor.size + blockedActors.length,
             actors: [...new Set([...unlockedByActor.keys(), ...blockedActors])],
             universes,
-            rareza: roleLabel(role, roleCategory),
-            unlocked: Boolean(unlockedVersion || item.coverVideo)
+            rol: representativeRole,
+            categoriaRol: representativeRoleCategory,
+            rareza: roleLabel(representativeRole, representativeRoleCategory),
+            unlocked: Boolean(unlockedVersion || item.coverVideo),
+            roleRank: roleRank(representativeRole, representativeRoleCategory)
           };
         })
         .filter(item => !normalizedSearch || normalizeName(item.name).includes(normalizedSearch))
@@ -5141,10 +5160,18 @@
             const matchesActor = item.actors.some((name) => normalizeName(name) === selectedActor);
             if (!matchesActor) return false;
           }
+          if (selectedRole !== 'todos') {
+            const matchesRole = normalizeRole(item.rol || '') === selectedRole;
+            if (!matchesRole) return false;
+          }
+          if (selectedRoleCategory !== 'todos') {
+            const matchesRoleCategory = normalizeRoleCategory(item.categoriaRol || '') === selectedRoleCategory;
+            if (!matchesRoleCategory) return false;
+          }
           return true;
         })
         .sort((a, b) => {
-          const roleDiff = roleRank(b.rol, b.categoriaRol) - roleRank(a.rol, a.categoriaRol);
+          const roleDiff = (b.roleRank ?? roleRank(b.rol, b.categoriaRol)) - (a.roleRank ?? roleRank(a.rol, a.categoriaRol));
           if (roleDiff !== 0) return roleDiff;
           return a.name.localeCompare(b.name, 'es', { sensitivity: 'base' });
         });
@@ -6169,6 +6196,14 @@
               <option value="todos">Todos los actores</option>
               ${indexActorFilters.map((name) => `<option value="${name}" ${state.indiceFilters.actor === name ? 'selected' : ''}>${name}</option>`).join('')}
             </select>
+            <select id="indiceRoleFilter" aria-label="Filtrar por rol">
+              <option value="todos">Todos los roles</option>
+              ${ROLE_OPTIONS.map((role) => `<option value="${role}" ${state.indiceFilters.role === role ? 'selected' : ''}>${role}</option>`).join('')}
+            </select>
+            <select id="indiceRoleCategoryFilter" aria-label="Filtrar por categoría de rol">
+              <option value="todos">Todas las categorías</option>
+              ${ROLE_CATEGORY_OPTIONS.map((category) => `<option value="${category}" ${state.indiceFilters.roleCategory === category ? 'selected' : ''}>${category}</option>`).join('')}
+            </select>
           </div>
           <section class="characters-gallery">
             ${indexItems.length
@@ -6187,6 +6222,14 @@
       });
       document.getElementById('indiceActorFilter')?.addEventListener('change', (event) => {
         state.indiceFilters.actor = event.target.value;
+        renderIndiceView();
+      });
+      document.getElementById('indiceRoleFilter')?.addEventListener('change', (event) => {
+        state.indiceFilters.role = event.target.value;
+        renderIndiceView();
+      });
+      document.getElementById('indiceRoleCategoryFilter')?.addEventListener('change', (event) => {
+        state.indiceFilters.roleCategory = event.target.value;
         renderIndiceView();
       });
       document.getElementById('toggleAddCharacterForm')?.addEventListener('click', () => {
