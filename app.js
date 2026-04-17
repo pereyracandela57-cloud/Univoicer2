@@ -5898,6 +5898,7 @@
         const focusedRoleTier = roleTierFromData(focusedRoleSource.rol, focusedRoleSource.categoriaRol);
         const focusedRoleClass = `role-${focusedRoleTier}`;
         const focusedRoleLabel = roleCategoryLabel(focusedRoleSource.rol, focusedRoleSource.categoriaRol);
+        const focusedRoleColor = roleColorValue(focusedRoleSource.rol, focusedRoleSource.categoriaRol);
         // Imagen de portada (si no hay videos reproducibles se muestra estado bloqueado)
         const profileImage = !isCharacterLocked && unlockedActors.length > 0 && unlockedActors[0].video
           ? getVideoThumbnail(unlockedActors[0].video)
@@ -5924,18 +5925,18 @@
               <button id="backToCharacterGallery" class="neon-btn toon-btn">← Volver al Índice</button>
             </div>
             
-            <div class="universe-hero character-hero">
+            <div class="universe-hero character-hero ${focusedRoleClass}" style="--character-role-color: ${focusedRoleColor};">
               ${profileAvatarMarkup}
               <div class="character-hero__content">
                 <div class="character-hero__title-row">
                   <h2 class="section-title detail-character character-hero__title">${focusedCharacter}</h2>
-                  <span class="badge character-hero__badge character-hero__badge--role character-hero__title-badge ${focusedRoleClass}">${focusedRoleLabel}</span>
                 </div>
                 <div class="detail-meta character-hero__badges">
                   ${universos.map((universe) => {
                     const universeLabel = String(universe || '').trim() || SPECIAL_UNASSIGNED_UNIVERSE;
                     return `<button type="button" class="badge character-hero__badge character-hero__badge--universes character-hero__badge--universe-red character-hero__badge--universe-link" data-open-universe-profile="${escapeHtml(universeLabel)}" aria-label="Abrir perfil del universo ${escapeHtml(universeLabel)}"><span class="character-hero__universe-name">${escapeHtml(universeLabel)}</span></button>`;
                   }).join('') || `<span class="badge character-hero__badge character-hero__badge--universes character-hero__badge--universe-red"><span class="character-hero__universe-name">${SPECIAL_UNASSIGNED_UNIVERSE}</span></span>`}
+                  <span class="badge character-hero__badge character-hero__badge--role character-hero__badge--role-inline ${focusedRoleClass}">${focusedRoleLabel}</span>
                 </div>
               </div>
               <div class="character-hero__actions">
