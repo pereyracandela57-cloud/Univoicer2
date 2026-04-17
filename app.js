@@ -2535,6 +2535,21 @@
       return String(video?.categoriaRol || video?.categoria_rol || '').trim() || DEFAULT_ROLE_CATEGORY;
     }
 
+    function getHighestRoleForVideos(videos = []) {
+      let best = null;
+      let maxRank = -1;
+      videos.forEach((video) => {
+        const rol = getVideoRole(video);
+        const categoriaRol = getVideoRoleCategory(video);
+        const rank = roleRank(rol, categoriaRol);
+        if (rank > maxRank) {
+          maxRank = rank;
+          best = { rol, categoriaRol };
+        }
+      });
+      return best || { rol: DEFAULT_ROLE, categoriaRol: DEFAULT_ROLE_CATEGORY };
+    }
+
     function getFilteredUniverseVideos() {
       return getUniverseVideos().filter(v => {
         const m1 = state.filters.personaje === 'todos' || (v.personaje || 'Sin personaje') === state.filters.personaje;
@@ -4101,7 +4116,7 @@
               ${groupedCharacterCards.map(item => renderCharacterGalleryCard({
                 name: item.characterName,
                 coverVideo: item.coverVideo,
-                rareza: getVideoRole(item.coverVideo),
+                ...getHighestRoleForVideos(item.videos),
                 unlocked: item.unlocked
               }, { locked: !item.unlocked })).join('') || '<p class="muted">No hay resultados con estos filtros.</p>'}
             </section>
@@ -5803,6 +5818,7 @@
       if (!cardName) return '';
       const locked = Boolean(options.locked ?? !item?.unlocked);
       const floatDelay = options.floatDelay || `-${(Math.random() * 2.6).toFixed(2)}s`;
+      const characterNameSize = getCharacterNameFontSize(cardName);
       const cardRoleTier = roleTierFromData(item?.rol, item?.categoriaRol, item?.rareza || '');
       const cardRoleClass = `role-${cardRoleTier}`;
       const cardRoleColor = roleColorValue(item?.rol, item?.categoriaRol, item?.rareza || '');
@@ -5841,10 +5857,19 @@
         >
           ${renderMedia()}
           <div class="meta">
-            <h3>${cardName}</h3>
+            <h3 style="--character-name-size:${characterNameSize};">${cardName}</h3>
           </div>
         </button>
       `;
+    }
+
+    function getCharacterNameFontSize(name) {
+      const length = String(name || '').trim().length;
+      if (length >= 30) return '.66rem';
+      if (length >= 24) return '.74rem';
+      if (length >= 18) return '.84rem';
+      if (length >= 14) return '.94rem';
+      return '1rem';
     }
 
     function renderIndiceView() {
