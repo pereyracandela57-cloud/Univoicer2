@@ -5865,11 +5865,11 @@
 
     function getCharacterNameFontSize(name) {
       const length = String(name || '').trim().length;
-      if (length >= 30) return '.66rem';
-      if (length >= 24) return '.74rem';
-      if (length >= 18) return '.84rem';
-      if (length >= 14) return '.94rem';
-      return '1rem';
+      if (length >= 30) return '.58rem';
+      if (length >= 24) return '.64rem';
+      if (length >= 18) return '.72rem';
+      if (length >= 14) return '.8rem';
+      return '.92rem';
     }
 
     function renderIndiceView() {

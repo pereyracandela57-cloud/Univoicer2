@@ -3509,10 +3509,10 @@
       margin: 0;
       padding: 4px 8px 6px;
       font-family: "Luckiest Guy", "Bangers", "Baloo 2", "Fredoka", "Comic Sans MS", "Trebuchet MS", cursive, sans-serif;
-      font-size: var(--character-name-size, clamp(1rem, .82rem + .6vw, 1.24rem));
+      font-size: var(--character-name-size, clamp(.84rem, .74rem + .42vw, 1.02rem));
       font-weight: 900;
-      line-height: 1.08;
-      letter-spacing: .01em;
+      line-height: 1.02;
+      letter-spacing: 0;
       color: #f8fbff;
       border: 1px solid color-mix(in srgb, var(--role-glow) 62%, rgba(232, 242, 255, .22));
       border-radius: 8px;
@@ -3533,8 +3533,8 @@
       overflow: hidden;
       overflow-wrap: anywhere;
       text-wrap: pretty;
-      min-height: calc(1.08em * 2);
-      max-height: calc(1.08em * 3);
+      min-height: calc(1.02em * 2);
+      max-height: calc(1.02em * 3);
     }
     .character-gallery-card p {
       margin: 0;
@@ -3543,11 +3543,16 @@
       line-height: 1.15;
     }
     .character-gallery-card[data-locked="true"] {
-      --locked-glow: rgba(166, 190, 255, .22);
-      opacity: .82;
+      --locked-glow: rgba(94, 112, 154, .14);
+      opacity: .9;
       background:
-        linear-gradient(160deg, color-mix(in srgb, var(--rarity-color) 30%, rgba(82, 89, 111, .92)), rgba(29, 33, 46, .96));
-      border-color: color-mix(in srgb, var(--rarity-color) 55%, rgba(168, 186, 225, .48));
+        linear-gradient(160deg, color-mix(in srgb, var(--rarity-color) 18%, rgba(24, 28, 40, .97)), rgba(8, 11, 18, .995));
+      border-color: color-mix(in srgb, var(--rarity-color) 28%, rgba(91, 102, 130, .42));
+      box-shadow:
+        0 20px 34px rgba(0, 0, 0, .84),
+        0 0 0 1px rgba(15, 19, 30, .9),
+        inset 0 0 0 1px rgba(65, 75, 101, .2),
+        inset 0 -16px 24px rgba(0, 0, 0, .62);
     }
     .character-gallery-card[data-locked="true"]::before {
       content: '';
@@ -3561,13 +3566,13 @@
         linear-gradient(130deg, rgba(11, 17, 35, .7), rgba(31, 38, 58, .2) 44%, rgba(7, 12, 28, .76)),
         repeating-linear-gradient(180deg, rgba(217, 235, 255, .08) 0 1px, rgba(9, 14, 30, 0) 1px 3px);
       background-size: 150% 150%, 150% 150%, 100% 100%, 100% 6px;
-      mix-blend-mode: screen;
-      opacity: .9;
+      mix-blend-mode: multiply;
+      opacity: .92;
       animation: none;
     }
     .character-gallery-card[data-locked="true"] .character-gallery-media--image {
-      filter: grayscale(1) brightness(.08) contrast(1.9) saturate(.7) drop-shadow(0 0 10px var(--locked-glow));
-      opacity: .9;
+      filter: grayscale(1) brightness(.03) contrast(2.1) saturate(.25) drop-shadow(0 0 6px var(--locked-glow));
+      opacity: .98;
       border-bottom-color: rgba(171, 187, 210, .24);
     }
     .character-gallery-card[data-locked="true"] .meta::before {
