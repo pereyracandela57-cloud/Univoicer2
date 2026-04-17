@@ -210,7 +210,7 @@
 
     function getVideoRoleCategory(video) {
       const explicitRole = String(video?.rol || '').trim();
-      const explicitCategory = String(video?.categoria_rol || '').trim().toUpperCase();
+      const explicitCategory = String(video?.categoriaRol || video?.categoria_rol || '').trim().toUpperCase();
       if (explicitRole) {
         return {
           rol: explicitRole,
@@ -2516,7 +2516,7 @@
     }
 
     function getVideoRoleCategory(video) {
-      return String(video?.categoriaRol || '').trim() || DEFAULT_ROLE_CATEGORY;
+      return String(video?.categoriaRol || video?.categoria_rol || '').trim() || DEFAULT_ROLE_CATEGORY;
     }
 
     function getFilteredUniverseVideos() {
@@ -4052,6 +4052,20 @@
             <label>URL de YouTube (Opcional)
               <input type="url" name="url_youtube" placeholder="https://www.youtube.com/watch?v=...">
             </label>
+            <label>Rol (obligatorio)
+              <select name="role" required>
+                ${['Protagonista', 'Villano', 'Secundario', 'Recurrente']
+                  .map((roleOption) => `<option value="${roleOption}" ${roleOption === 'Recurrente' ? 'selected' : ''}>${roleOption}</option>`)
+                  .join('')}
+              </select>
+            </label>
+            <label>Categoría (obligatoria)
+              <select name="roleCategory" required>
+                ${['A', 'B']
+                  .map((categoryOption) => `<option value="${categoryOption}" ${categoryOption === 'A' ? 'selected' : ''}>${categoryOption}</option>`)
+                  .join('')}
+              </select>
+            </label>
           `}
           <div class="actions">
             <button type="submit" class="neon-btn neon-btn--primary">${state.universeAddMode === 'video' ? 'Desbloquear Personaje' : 'Agregar Personaje'}</button>
@@ -4324,6 +4338,8 @@
         const selectedActors = formData.getAll('actor_de_doblaje')
           .map((value) => String(value || '').trim())
           .filter(Boolean);
+        const selectedRole = String(formData.get('role') || '').trim() || 'Recurrente';
+        const selectedRoleCategory = String(formData.get('roleCategory') || '').trim().toUpperCase() || 'A';
         if (state.universeAddMode === 'character') {
           if (!characterName) {
             if (feedback) feedback.textContent = 'Debes completar el nombre del personaje.';
@@ -4366,8 +4382,8 @@
               personaje: characterName,
               actor_de_doblaje: actorItem,
               url_youtube: unlocked ? normalizedUrl : '',
-              rol: DEFAULT_ROLE,
-              categoriaRol: DEFAULT_ROLE_CATEGORY,
+              rol: selectedRole,
+              categoriaRol: selectedRoleCategory,
               thumbnail: unlocked
                 ? (metadata?.thumbnail || createPlaceholderCover(characterName))
                 : createPlaceholderCover(state.universe)
@@ -4605,6 +4621,13 @@
       const universeOptions = getUniverseOptionsForIndiceFilters();
       const currentActorsNormalized = new Set(currentActors.map((actorName) => normalizeName(actorName)));
       const currentUniversesNormalized = new Set(currentUniverses.map((universeName) => normalizeUniverseName(universeName)));
+      const roleSourceVideo = characterVideos.find((entry) => String(entry?.rol || '').trim()) || characterVideos[0];
+      const currentCharacterRole = ROLE_OPTIONS.find((roleOption) => (
+        normalizeRole(roleOption) === normalizeRole(roleSourceVideo?.rol || '')
+      )) || 'Recurrente';
+      const currentCharacterRoleCategory = ROLE_CATEGORY_OPTIONS.find((categoryOption) => (
+        normalizeRoleCategory(categoryOption) === normalizeRoleCategory(roleSourceVideo?.categoriaRol || roleSourceVideo?.categoria_rol || '')
+      )) || 'A';
 
       const editModal = document.createElement('section');
       editModal.className = 'detail-modal';
@@ -4638,6 +4661,20 @@
                     addNewLabel: '＋ Nuevo universo'
                   })}
                 </label>
+                <label>Rol
+                  <select name="role" required>
+                    ${['Protagonista', 'Villano', 'Secundario', 'Recurrente']
+                      .map((roleOption) => `<option value="${roleOption}" ${roleOption === currentCharacterRole ? 'selected' : ''}>${roleOption}</option>`)
+                      .join('')}
+                  </select>
+                </label>
+                <label>Categoría
+                  <select name="roleCategory" required>
+                    ${['A', 'B']
+                      .map((categoryOption) => `<option value="${categoryOption}" ${categoryOption === currentCharacterRoleCategory ? 'selected' : ''}>${categoryOption}</option>`)
+                      .join('')}
+                  </select>
+                </label>
               </div>
               <div class="character-inline-editor__actions">
                 <button type="submit" class="neon-btn neon-btn--primary">Guardar cambios</button>
@@ -4666,12 +4703,14 @@
         const nextUniverses = [...new Set(
           formData.getAll('characterUniverses').map((item) => String(item || '').trim()).filter(Boolean)
         )];
+        const nextRole = String(formData.get('role') || '').trim() || 'Recurrente';
+        const nextRoleCategory = String(formData.get('roleCategory') || '').trim().toUpperCase() || 'A';
         if (!nextCharacterName) return;
 
         const { canonicalName, canonicalRole, canonicalRoleCategory, canonicalUniverses } = updateCharacterMetadata(focusedCharacter, {
           nextCharacterName,
-          nextRole: DEFAULT_ROLE,
-          nextRoleCategory: DEFAULT_ROLE_CATEGORY,
+          nextRole,
+          nextRoleCategory,
           nextUniverses
         });
 
@@ -5545,6 +5584,8 @@
           .map((value) => String(value || '').trim())
           .filter(Boolean)
       )];
+      const selectedRole = String(formData.get('role') || '').trim() || 'Recurrente';
+      const selectedRoleCategory = String(formData.get('roleCategory') || '').trim().toUpperCase() || 'A';
 
       if (!characterName) {
         state.draftCharacterFeedback = 'Debes ingresar el nombre del personaje.';
@@ -5573,8 +5614,8 @@
           personaje: characterName,
           actor_de_doblaje: 'Sin actor',
           url_youtube: '',
-          rol: DEFAULT_ROLE,
-          categoriaRol: DEFAULT_ROLE_CATEGORY,
+          rol: selectedRole,
+          categoriaRol: selectedRoleCategory,
           thumbnail: createPlaceholderCover(characterName)
         });
       } else {
@@ -5587,8 +5628,8 @@
             personaje: characterName,
             actor_de_doblaje: actorName,
             url_youtube: '',
-            rol: DEFAULT_ROLE,
-            categoriaRol: DEFAULT_ROLE_CATEGORY,
+            rol: selectedRole,
+            categoriaRol: selectedRoleCategory,
             thumbnail: createPlaceholderCover(characterName)
           });
           blockCharacterForActor(actorName, characterName);
@@ -5786,6 +5827,13 @@
         ])].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
         const selectedActorsNormalized = new Set(actorCards.map((item) => normalizeName(item.actorName)));
         const selectedUniversesNormalized = new Set(universos.map((universeName) => normalizeUniverseName(universeName)));
+        const roleSourceVideo = charVideos.find((video) => String(video?.rol || '').trim()) || charVideos[0];
+        const currentCharacterRole = ROLE_OPTIONS.find((roleOption) => (
+          normalizeRole(roleOption) === normalizeRole(roleSourceVideo?.rol || '')
+        )) || 'Recurrente';
+        const currentCharacterRoleCategory = ROLE_CATEGORY_OPTIONS.find((categoryOption) => (
+          normalizeRoleCategory(categoryOption) === normalizeRoleCategory(roleSourceVideo?.categoriaRol || roleSourceVideo?.categoria_rol || '')
+        )) || 'A';
 
         const isCharacterLocked = realVideos.length === 0;
         const customLockedAvatarUrl = getCharacterLockedAvatarUrl(focusedCharacter);
@@ -5861,6 +5909,20 @@
                 <label>Avatar bloqueado (URL opcional)
                   <input type="text" name="lockedAvatarUrl" value="${customLockedAvatarUrl}" placeholder="https://...">
                 </label>
+                <label>Rol
+                  <select name="role" required>
+                    ${['Protagonista', 'Villano', 'Secundario', 'Recurrente']
+                      .map((roleOption) => `<option value="${roleOption}" ${roleOption === currentCharacterRole ? 'selected' : ''}>${roleOption}</option>`)
+                      .join('')}
+                  </select>
+                </label>
+                <label>Categoría
+                  <select name="roleCategory" required>
+                    ${['A', 'B']
+                      .map((categoryOption) => `<option value="${categoryOption}" ${categoryOption === currentCharacterRoleCategory ? 'selected' : ''}>${categoryOption}</option>`)
+                      .join('')}
+                  </select>
+                </label>
               </div>
               <div class="character-inline-editor__actions">
                 <button type="submit" class="neon-btn neon-btn--primary">Guardar cambios</button>
@@ -5931,6 +5993,8 @@
           const selectedActors = formData.getAll('characterActors').map((value) => String(value || '').trim()).filter(Boolean);
           const selectedUniverses = formData.getAll('characterUniverses').map((value) => String(value || '').trim()).filter(Boolean);
           const lockedAvatarUrl = String(formData.get('lockedAvatarUrl') || '').trim();
+          const nextRole = String(formData.get('role') || '').trim() || 'Recurrente';
+          const nextRoleCategory = String(formData.get('roleCategory') || '').trim().toUpperCase() || 'A';
           if (!newName) return;
 
           const newActorsList = [...new Set(selectedActors)];
@@ -5942,8 +6006,8 @@
             canonicalUniverses: newUniversesList
           } = updateCharacterMetadata(focusedCharacter, {
             nextCharacterName: newName,
-            nextRole: DEFAULT_ROLE,
-            nextRoleCategory: DEFAULT_ROLE_CATEGORY,
+            nextRole,
+            nextRoleCategory,
             nextUniverses: parsedUniverses
           });
 
@@ -6150,6 +6214,20 @@
                   emptyMessage: 'No hay universos disponibles.',
                   addNewLabel: '＋ Nuevo universo'
                 })}
+              </label>
+              <label>Rol (obligatorio)
+                <select name="role" required>
+                  ${['Protagonista', 'Villano', 'Secundario', 'Recurrente']
+                    .map((roleOption) => `<option value="${roleOption}" ${roleOption === 'Recurrente' ? 'selected' : ''}>${roleOption}</option>`)
+                    .join('')}
+                </select>
+              </label>
+              <label>Categoría (obligatoria)
+                <select name="roleCategory" required>
+                  ${['A', 'B']
+                    .map((categoryOption) => `<option value="${categoryOption}" ${categoryOption === 'A' ? 'selected' : ''}>${categoryOption}</option>`)
+                    .join('')}
+                </select>
               </label>
               <p id="addCharacterFeedback" class="inline-feedback" aria-live="polite">${state.draftCharacterFeedback || ''}</p>
               <div class="actions">
