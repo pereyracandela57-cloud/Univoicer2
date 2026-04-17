@@ -259,9 +259,9 @@
         'villano-a': '#ff3b30',
         'villano-b': '#8e44ff',
         'secundario-a': '#1f8f4d',
-        'secundario-b': '#72d66a',
-        'recurrente-a': '#ffd84a',
-        'recurrente-b': '#ff9f43'
+        'secundario-b': '#ffd84a',
+        'recurrente-a': '#ffffff',
+        'recurrente-b': '#3a3a3a'
       };
       return rolePalette[roleTier] || '#8cb8ff';
     }

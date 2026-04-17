@@ -24,9 +24,9 @@
       --role-villano-a: #ff3b30;
       --role-villano-b: #8e44ff;
       --role-secundario-a: #00b86b;
-      --role-secundario-b: #9ae03e;
-      --role-recurrente-a: #ffd84a;
-      --role-recurrente-b: #ff9f43;
+      --role-secundario-b: #ffd84a;
+      --role-recurrente-a: #ffffff;
+      --role-recurrente-b: #3a3a3a;
       --shadow: 0 18px 40px rgba(2, 8, 20, .62);
       --shadow-soft: 0 10px 24px rgba(3, 11, 29, .52);
       --radius: 22px;
