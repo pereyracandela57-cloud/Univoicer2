@@ -19,12 +19,12 @@
       --neon-purple: #b98cff;
       --ok: #179d6c;
       --ok-soft: rgba(23, 157, 108, .18);
-      --role-protagonista-a: #2f7dff;
-      --role-protagonista-b: #24d8d8;
+      --role-protagonista-a: #2b5bff;
+      --role-protagonista-b: #12e4ff;
       --role-villano-a: #ff3b30;
       --role-villano-b: #8e44ff;
-      --role-secundario-a: #1f8f4d;
-      --role-secundario-b: #72d66a;
+      --role-secundario-a: #00b86b;
+      --role-secundario-b: #9ae03e;
       --role-recurrente-a: #ffd84a;
       --role-recurrente-b: #ff9f43;
       --shadow: 0 18px 40px rgba(2, 8, 20, .62);
@@ -3399,6 +3399,11 @@
     }
     .character-gallery-card[data-locked="false"] {
       border-color: color-mix(in srgb, var(--rarity-color, rgba(111, 180, 255, .7)) 88%, rgba(248, 252, 255, .9));
+      background:
+        linear-gradient(126deg, rgba(241, 248, 255, .28) 0%, rgba(241, 248, 255, 0) 22%, rgba(145, 185, 224, .15) 40%, rgba(228, 242, 255, .22) 54%, rgba(122, 162, 204, .11) 66%, rgba(10, 17, 36, 0) 84%),
+        linear-gradient(154deg, rgba(7, 14, 31, .14) 0%, rgba(7, 14, 31, 0) 36%, rgba(214, 236, 255, .1) 52%, rgba(6, 13, 28, .22) 72%, rgba(6, 12, 26, 0) 100%),
+        repeating-linear-gradient(160deg, rgba(224, 238, 255, .08) 0 1px, rgba(24, 40, 70, .04) 1px 3px, rgba(10, 20, 40, 0) 3px 7px),
+        linear-gradient(168deg, color-mix(in srgb, var(--rarity-color) 26%, rgba(48, 72, 112, .96)) 0%, rgba(24, 38, 70, .98) 48%, rgba(12, 20, 40, .99) 100%);
       box-shadow:
         0 20px 32px rgba(2, 7, 19, .84),
         0 30px 36px -16px rgba(0, 0, 0, .74),
@@ -3407,6 +3412,9 @@
         0 0 52px color-mix(in srgb, var(--rarity-color, var(--role-glow)) 34%, transparent),
         inset 1px 1px 0 rgba(241, 250, 255, .34),
         inset -2px -4px 15px rgba(4, 11, 26, .64);
+    }
+    .character-gallery-card[data-locked="false"] .character-gallery-media--image {
+      filter: brightness(1.12) contrast(1.06) saturate(1.14);
     }
     .character-gallery-card[data-locked="false"]::after {
       border-color: color-mix(in srgb, var(--role-glow) 78%, rgba(238, 248, 255, .84));
@@ -3571,7 +3579,7 @@
       animation: none;
     }
     .character-gallery-card[data-locked="true"] .character-gallery-media--image {
-      filter: grayscale(1) brightness(.03) contrast(2.1) saturate(.25) drop-shadow(0 0 6px var(--locked-glow));
+      filter: grayscale(.72) brightness(.42) contrast(1.24) saturate(.42) drop-shadow(0 0 6px var(--locked-glow));
       opacity: .98;
       border-bottom-color: rgba(171, 187, 210, .24);
     }
@@ -4380,8 +4388,8 @@
       place-items: center;
     }
     .profile-avatar--locked.has-custom-image::before {
-      background: linear-gradient(rgba(0, 0, 0, .75), rgba(0, 0, 0, .75));
-      box-shadow: inset 0 0 34px rgba(0, 0, 0, .88), inset 0 0 0 1px rgba(210, 236, 255, .12);
+      background: linear-gradient(rgba(4, 11, 22, .44), rgba(4, 11, 22, .4));
+      box-shadow: inset 0 0 28px rgba(0, 0, 0, .5), inset 0 0 0 1px rgba(210, 236, 255, .16);
     }
     .profile-avatar--locked::before {
       content: '';
@@ -4442,9 +4450,9 @@
     }
     .profile-avatar--locked.has-custom-image .profile-avatar-lock-label {
       border: 0;
-      background: rgba(4, 9, 16, .46);
-      padding: 6px 8px;
-      font-size: 1.25rem;
+      background: rgba(4, 9, 16, .34);
+      padding: 5px 7px;
+      font-size: 1.15rem;
       line-height: 1;
       gap: 0;
       box-shadow: 0 0 12px rgba(0, 0, 0, .48);
