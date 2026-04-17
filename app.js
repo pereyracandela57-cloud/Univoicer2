@@ -255,13 +255,13 @@
       const roleTier = roleTierFromData(rol, categoriaRol, rareza);
       const rolePalette = {
         'protagonista-a': '#2f7dff',
-        'protagonista-b': '#66d9ff',
-        'villano-a': '#ff4d5f',
-        'villano-b': '#a86bff',
-        'secundario-a': '#ffd54a',
-        'secundario-b': '#ff9f43',
-        'recurrente-a': '#f5fbff',
-        'recurrente-b': '#a5b0c2'
+        'protagonista-b': '#24d8d8',
+        'villano-a': '#ff3b30',
+        'villano-b': '#8e44ff',
+        'secundario-a': '#1f8f4d',
+        'secundario-b': '#72d66a',
+        'recurrente-a': '#ffd84a',
+        'recurrente-b': '#ff9f43'
       };
       return rolePalette[roleTier] || '#8cb8ff';
     }
@@ -5803,6 +5803,9 @@
       if (!cardName) return '';
       const locked = Boolean(options.locked ?? !item?.unlocked);
       const floatDelay = options.floatDelay || `-${(Math.random() * 2.6).toFixed(2)}s`;
+      const cardRoleTier = roleTierFromData(item?.rol, item?.categoriaRol, item?.rareza || '');
+      const cardRoleClass = `role-${cardRoleTier}`;
+      const cardRoleColor = roleColorValue(item?.rol, item?.categoriaRol, item?.rareza || '');
 
       const renderMedia = () => {
         const customAvatarUrl = getCharacterLockedAvatarUrl(cardName);
@@ -5830,10 +5833,11 @@
       return `
         <button
           type="button"
-          class="character-gallery-card"
+          class="character-gallery-card ${cardRoleClass}"
           data-open-character="${cardName}"
+          data-role-tier="${cardRoleTier}"
           data-locked="${locked ? 'true' : 'false'}"
-          style="--float-delay:${floatDelay};"
+          style="--float-delay:${floatDelay}; --rarity-color:${cardRoleColor};"
         >
           ${renderMedia()}
           <div class="meta">
@@ -5880,6 +5884,20 @@
 
         const isCharacterLocked = realVideos.length === 0;
         const customLockedAvatarUrl = getCharacterLockedAvatarUrl(focusedCharacter);
+        const focusedRoleSource = charVideos
+          .map((video) => {
+            const rawRole = normalizeRole(video?.rol || video?.role) || normalizeRole(DEFAULT_ROLE);
+            const rawCategory = normalizeRoleCategory(video?.categoriaRol || video?.roleCategory) || normalizeRoleCategory(DEFAULT_ROLE_CATEGORY);
+            return {
+              rol: rawRole,
+              categoriaRol: rawCategory,
+              rank: roleRank(rawRole, rawCategory)
+            };
+          })
+          .sort((a, b) => b.rank - a.rank)[0] || { rol: normalizeRole(DEFAULT_ROLE), categoriaRol: normalizeRoleCategory(DEFAULT_ROLE_CATEGORY) };
+        const focusedRoleTier = roleTierFromData(focusedRoleSource.rol, focusedRoleSource.categoriaRol);
+        const focusedRoleClass = `role-${focusedRoleTier}`;
+        const focusedRoleLabel = roleCategoryLabel(focusedRoleSource.rol, focusedRoleSource.categoriaRol);
         // Imagen de portada (si no hay videos reproducibles se muestra estado bloqueado)
         const profileImage = !isCharacterLocked && unlockedActors.length > 0 && unlockedActors[0].video
           ? getVideoThumbnail(unlockedActors[0].video)
@@ -5909,7 +5927,10 @@
             <div class="universe-hero character-hero">
               ${profileAvatarMarkup}
               <div class="character-hero__content">
-                <h2 class="section-title detail-character character-hero__title">${focusedCharacter}</h2>
+                <div class="character-hero__title-row">
+                  <h2 class="section-title detail-character character-hero__title">${focusedCharacter}</h2>
+                  <span class="badge character-hero__badge character-hero__badge--role character-hero__title-badge ${focusedRoleClass}">${focusedRoleLabel}</span>
+                </div>
                 <div class="detail-meta character-hero__badges">
                   ${universos.map((universe) => {
                     const universeLabel = String(universe || '').trim() || SPECIAL_UNASSIGNED_UNIVERSE;
