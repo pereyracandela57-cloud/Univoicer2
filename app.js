@@ -5768,7 +5768,7 @@
       const rarityValue = String(item?.rareza || item?.coverVideo?.rareza || 'Común');
       const roleTier = roleTierFromData(item?.rol, item?.categoriaRol, rarityValue);
       const [roleName, roleCategory] = roleTier.split('-');
-      const roleData = {
+      const roleFilterData = {
         role: roleName || 'recurrente',
         category: roleCategory || 'a',
         tier: roleTier
@@ -5804,9 +5804,9 @@
           type="button"
           class="character-gallery-card"
           data-open-character="${cardName}"
-          data-role="${roleData.role}"
-          data-role-category="${roleData.category}"
-          data-role-tier="${roleData.tier}"
+          data-role="${roleFilterData.role}"
+          data-role-category="${roleFilterData.category}"
+          data-role-tier="${roleFilterData.tier}"
           data-locked="${locked ? 'true' : 'false'}"
           style="--role-glow:${glowColor}; --float-delay:${floatDelay};"
         >
