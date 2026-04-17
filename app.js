@@ -104,7 +104,7 @@
     const ROLE_CATEGORY_OPTIONS = ['A', 'B'];
     const ALLOWED_ROLES = [...ROLE_OPTIONS];
     const ALLOWED_ROLE_CATEGORIES = [...ROLE_CATEGORY_OPTIONS];
-    const DEFAULT_ROLE = 'Protagonista';
+    const DEFAULT_ROLE = 'Recurrente';
     const DEFAULT_ROLE_CATEGORY = 'A';
     const MAX_LOCAL_IMAGE_BYTES = 2 * 1024 * 1024;
     const NODE_HALF_WIDTH = 91;
@@ -306,6 +306,12 @@
 
     function normalizeVideoRoleData(video) {
       if (!video || typeof video !== 'object') return video;
+      const explicitRole = String(video.rol || video.role || '').trim();
+      const explicitRoleCategory = String(
+        video.categoriaRol || video.categoria_rol || video.roleCategory || ''
+      ).trim();
+      if (!explicitRole) video.rol = DEFAULT_ROLE;
+      if (!explicitRoleCategory) video.categoriaRol = DEFAULT_ROLE_CATEGORY;
       const normalizedRole = normalizeRole(video.rol || video.role);
       const normalizedCategory = normalizeRoleCategory(video.categoriaRol || video.roleCategory);
       video.rol = normalizedRole;
@@ -1153,8 +1159,8 @@
         personaje: cleanCharacterName,
         actor_de_doblaje: cleanActorName,
         url_youtube: '',
-        rol: inheritedRole,
-        categoriaRol: inheritedRoleCategory,
+        rol: inheritedRole || DEFAULT_ROLE,
+        categoriaRol: inheritedRoleCategory || DEFAULT_ROLE_CATEGORY,
         thumbnail: createPlaceholderCover(cleanCharacterName)
       });
       return true;
@@ -1355,23 +1361,32 @@
     }
 
     function loadVideosFromStorage() {
+      let migratedRoleDefaults = false;
       try {
         const raw = localStorage.getItem(VIDEOS_STORAGE_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
           if (Array.isArray(parsed)) {
+            const migratedVideos = parsed
+              .filter(video => video && typeof video === 'object')
+              .map((video) => {
+                const hadRole = String(video.rol || video.role || '').trim();
+                const hadRoleCategory = String(video.categoriaRol || video.categoria_rol || video.roleCategory || '').trim();
+                const normalizedVideo = normalizeVideoRoleData(video);
+                if (!hadRole || !hadRoleCategory) migratedRoleDefaults = true;
+                return normalizedVideo;
+              });
             VIDEOS.splice(
               0,
               VIDEOS.length,
-              ...parsed
-                .filter(video => video && typeof video === 'object')
-                .map((video) => normalizeVideoRoleData(video))
+              ...migratedVideos
             );
           }
         }
       } catch (_) {
         VIDEOS.splice(0, VIDEOS.length);
       }
+      if (migratedRoleDefaults) saveVideos();
       buildAutoMarathonPlaylist();
     }
 
@@ -6569,8 +6584,8 @@
           personaje: canonicalCharacterName,
           actor_de_doblaje: cleanActorName,
           url_youtube: '',
-          rol: inheritedRole,
-          categoriaRol: inheritedRoleCategory,
+          rol: inheritedRole || DEFAULT_ROLE,
+          categoriaRol: inheritedRoleCategory || DEFAULT_ROLE_CATEGORY,
           thumbnail: createPlaceholderCover(canonicalCharacterName)
         });
       };
