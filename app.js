@@ -64,6 +64,7 @@
       indicePreviewCharacter: '',
       indicePreviewAnchor: null,
       indiceCollapsedRarities: new Set(),
+      indiceCollapsedRoleGroups: new Set(),
       showCharacterInlineEdit: false,
       showCharacterInlineDelete: false,
       expandedUniverses: new Set(),
@@ -6224,8 +6225,32 @@
       )].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const indexUniverseFilters = getUniverseOptionsForIndiceFilters();
       const indexActorFilters = getActorOptionsForIndiceFilters();
-      const groupedIndexItems = new Map();
-      groupedIndexItems.set('Personajes', indexItems);
+      const ROLE_GROUP_FALLBACK = 'Sin rol';
+      const toRoleGroupKey = (item) => {
+        const cleanRole = String(item?.rol || '').trim();
+        const normalizedRole = normalizeRole(cleanRole);
+        const normalizedCategory = normalizeRoleCategory(item?.categoriaRol || '');
+        if (!normalizedRole) return ROLE_GROUP_FALLBACK;
+        const roleLabel = normalizedRole.charAt(0).toUpperCase() + normalizedRole.slice(1);
+        const categoryLabel = normalizedCategory ? normalizedCategory.toUpperCase() : '';
+        return [roleLabel, categoryLabel].filter(Boolean).join(' ');
+      };
+      const roleGroupSortRank = (groupKey) => {
+        if (groupKey === ROLE_GROUP_FALLBACK) return -1;
+        const [rolePart = '', categoryPart = ''] = String(groupKey || '').trim().split(/\s+/);
+        return roleRank(rolePart, categoryPart);
+      };
+      const groupedIndexItems = indexItems.reduce((acc, item) => {
+        const roleGroupKey = toRoleGroupKey(item);
+        if (!acc.has(roleGroupKey)) acc.set(roleGroupKey, []);
+        acc.get(roleGroupKey).push(item);
+        return acc;
+      }, new Map());
+      const sortedRoleGroups = [...groupedIndexItems.entries()].sort(([groupA], [groupB]) => {
+        const rankDiff = roleGroupSortRank(groupB) - roleGroupSortRank(groupA);
+        if (rankDiff !== 0) return rankDiff;
+        return groupA.localeCompare(groupB, 'es', { sensitivity: 'base' });
+      });
       viewIndice.innerHTML = `
         <section class="mock-shell">
           <div class="indice-toolbar">
@@ -6298,9 +6323,34 @@
               ${ROLE_CATEGORY_OPTIONS.map((category) => `<option value="${category}" ${state.indiceFilters.roleCategory === category ? 'selected' : ''}>${category}</option>`).join('')}
             </select>
           </div>
+          ${indexItems.length ? `
+            <div class="indice-toolbar" style="margin-top: 10px;">
+              <h3 style="margin:0; font-size: .95rem;">Agrupación por rol</h3>
+              <div class="actions">
+                <button id="expandAllRoleGroupsBtn" type="button" class="neon-btn">Expandir todo</button>
+                <button id="collapseAllRoleGroupsBtn" type="button" class="neon-btn">Replegar todo</button>
+              </div>
+            </div>
+          ` : ''}
           <section class="characters-gallery">
             ${indexItems.length
-              ? groupedIndexItems.get('Personajes').map(item => renderCharacterGalleryCard(item, { locked: !item.unlocked })).join('')
+              ? sortedRoleGroups.map(([groupKey, groupItems]) => {
+                const isCollapsed = state.indiceCollapsedRoleGroups.has(groupKey);
+                return `
+                  <button
+                    type="button"
+                    class="indice-group-divider indice-group-toggle"
+                    data-toggle-role-group="${escapeHtml(groupKey)}"
+                    aria-expanded="${isCollapsed ? 'false' : 'true'}"
+                  >
+                    <span>${escapeHtml(groupKey)} (${groupItems.length})</span>
+                    <span class="indice-group-toggle-icon">${isCollapsed ? '▸' : '▾'}</span>
+                  </button>
+                  ${isCollapsed
+                    ? ''
+                    : groupItems.map(item => renderCharacterGalleryCard(item, { locked: !item.unlocked })).join('')}
+                `;
+              }).join('')
               : '<p class="muted">No hay personajes cargados.</p>'}
           </section>
         </section>
