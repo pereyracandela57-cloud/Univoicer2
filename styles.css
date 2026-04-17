@@ -20,13 +20,13 @@
       --ok: #179d6c;
       --ok-soft: rgba(23, 157, 108, .18);
       --role-protagonista-a: #2f7dff;
-      --role-protagonista-b: #66d9ff;
-      --role-villano-a: #ff4d5f;
-      --role-villano-b: #a86bff;
-      --role-secundario-a: #ffd54a;
-      --role-secundario-b: #ff9f43;
-      --role-recurrente-a: #f5fbff;
-      --role-recurrente-b: #a5b0c2;
+      --role-protagonista-b: #24d8d8;
+      --role-villano-a: #ff3b30;
+      --role-villano-b: #8e44ff;
+      --role-secundario-a: #1f8f4d;
+      --role-secundario-b: #72d66a;
+      --role-recurrente-a: #ffd84a;
+      --role-recurrente-b: #ff9f43;
       --shadow: 0 18px 40px rgba(2, 8, 20, .62);
       --shadow-soft: 0 10px 24px rgba(3, 11, 29, .52);
       --radius: 22px;
@@ -2873,6 +2873,22 @@
       display: grid;
       gap: 12px;
     }
+    .character-hero__title-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .character-hero__title-badge {
+      min-block-size: auto;
+      padding: 4px 10px;
+      font-size: .76rem;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      border-radius: 999px;
+      line-height: 1.2;
+      box-shadow: 0 0 0 1px color-mix(in srgb, var(--badge-glow) 32%, transparent), 0 0 14px var(--badge-glow);
+    }
     .character-hero__title {
       font-size: clamp(2.45rem, 1.85rem + 2.2vw, 3.7rem);
       font-family: "Marker Felt", "Comic Sans MS", "Chalkboard SE", "Trebuchet MS", cursive, sans-serif;
@@ -2980,6 +2996,21 @@
       --badge-base-2: color-mix(in srgb, var(--role-protagonista-a) 12%, rgba(20, 11, 5, .95));
       --badge-edge: color-mix(in srgb, var(--role-protagonista-a) 56%, rgba(255, 215, 139, .5));
     }
+    .character-hero__badge--role {
+      --badge-glow: color-mix(in srgb, var(--rarity-color, rgba(111, 180, 255, .7)) 64%, rgba(170, 220, 255, .36));
+      --badge-top: color-mix(in srgb, var(--rarity-color, rgba(111, 180, 255, .7)) 28%, rgba(233, 246, 255, .34));
+      --badge-base: color-mix(in srgb, var(--rarity-color, rgba(111, 180, 255, .7)) 22%, rgba(11, 30, 61, .9));
+      --badge-base-2: color-mix(in srgb, var(--rarity-color, rgba(111, 180, 255, .7)) 12%, rgba(5, 14, 32, .92));
+      --badge-edge: color-mix(in srgb, var(--rarity-color, rgba(111, 180, 255, .7)) 52%, rgba(166, 219, 255, .34));
+    }
+    .character-hero__badge--role.role-protagonista-a { --rarity-color: var(--role-protagonista-a); }
+    .character-hero__badge--role.role-protagonista-b { --rarity-color: var(--role-protagonista-b); }
+    .character-hero__badge--role.role-villano-a { --rarity-color: var(--role-villano-a); }
+    .character-hero__badge--role.role-villano-b { --rarity-color: var(--role-villano-b); }
+    .character-hero__badge--role.role-secundario-a { --rarity-color: var(--role-secundario-a); }
+    .character-hero__badge--role.role-secundario-b { --rarity-color: var(--role-secundario-b); }
+    .character-hero__badge--role.role-recurrente-a { --rarity-color: var(--role-recurrente-a); }
+    .character-hero__badge--role.role-recurrente-b { --rarity-color: var(--role-recurrente-b); }
     .character-hero__badge--universes {
       --badge-glow: rgba(123, 215, 255, .26);
       overflow: hidden;
@@ -3261,10 +3292,19 @@
       position: relative;
       z-index: 1;
     }
+    .character-gallery-card.role-protagonista-a { --rarity-color: var(--role-protagonista-a); }
+    .character-gallery-card.role-protagonista-b { --rarity-color: var(--role-protagonista-b); }
+    .character-gallery-card.role-villano-a { --rarity-color: var(--role-villano-a); }
+    .character-gallery-card.role-villano-b { --rarity-color: var(--role-villano-b); }
+    .character-gallery-card.role-secundario-a { --rarity-color: var(--role-secundario-a); }
+    .character-gallery-card.role-secundario-b { --rarity-color: var(--role-secundario-b); }
+    .character-gallery-card.role-recurrente-a { --rarity-color: var(--role-recurrente-a); }
+    .character-gallery-card.role-recurrente-b { --rarity-color: var(--role-recurrente-b); }
     .character-gallery-card {
-      --role-glow: rgba(111, 180, 255, .4);
+      --rarity-color: rgba(111, 180, 255, .7);
+      --role-glow: color-mix(in srgb, var(--rarity-color) 74%, rgba(181, 216, 255, .62));
       --float-delay: 0s;
-      border: 1.5px solid color-mix(in srgb, var(--role-glow) 78%, white 22%);
+      border: 1.5px solid color-mix(in srgb, var(--rarity-color, rgba(111, 180, 255, .7)) 74%, rgba(240, 248, 255, .95));
       border-radius: 16px;
       overflow: hidden;
       background:
@@ -3317,14 +3357,15 @@
       pointer-events: none;
     }
     .character-gallery-card:hover {
-      border-color: color-mix(in srgb, var(--role-glow) 92%, white 8%);
+      border-color: color-mix(in srgb, var(--rarity-color, rgba(111, 180, 255, .7)) 90%, white 10%);
       transform: translate3d(0, -5px, 0) scale(1.035);
       box-shadow:
         0 24px 34px rgba(2, 7, 19, .84),
         0 34px 38px -16px rgba(0, 0, 0, .74),
         0 0 0 2px color-mix(in srgb, var(--role-glow) 72%, white 28%),
-        0 0 34px color-mix(in srgb, var(--role-glow) 54%, transparent),
-        0 0 56px color-mix(in srgb, var(--role-glow) 34%, transparent),
+        0 0 34px color-mix(in srgb, var(--rarity-color, var(--role-glow)) 56%, transparent),
+        0 0 56px color-mix(in srgb, var(--rarity-color, var(--role-glow)) 42%, transparent),
+        0 0 84px color-mix(in srgb, var(--rarity-color, var(--role-glow)) 24%, transparent),
         inset 1px 1px 0 rgba(241, 250, 255, .34),
         inset -2px -4px 15px rgba(4, 11, 26, .64);
     }
