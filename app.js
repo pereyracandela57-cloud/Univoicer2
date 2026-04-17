@@ -19,7 +19,7 @@
     const state = {
       view: 'map',
       universe: null,
-      filters: { personaje: 'todos', actor: 'todos', rol: 'todos', categoriaRol: 'todos' },
+      filters: { personaje: 'todos', actor: 'todos' },
       search: { personaje: '', actor: '' },
       selectedVideoId: null,
       actorFocus: null,
@@ -2523,9 +2523,7 @@
       return getUniverseVideos().filter(v => {
         const m1 = state.filters.personaje === 'todos' || (v.personaje || 'Sin personaje') === state.filters.personaje;
         const m2 = state.filters.actor === 'todos' || (v.actor_de_doblaje || 'Sin actor') === state.filters.actor;
-        const m3 = state.filters.rol === 'todos' || getVideoRole(v) === state.filters.rol;
-        const m4 = state.filters.categoriaRol === 'todos' || getVideoRoleCategory(v) === state.filters.categoriaRol;
-        return m1 && m2 && m3 && m4;
+        return m1 && m2;
       });
     }
 
@@ -4044,16 +4042,6 @@
             <label>Nombre del Personaje (Requerido)
               <input type="text" name="personaje" required placeholder="Ej. Gokú">
             </label>
-            <label>Rol
-              <select name="rol">
-                ${roles.map((rol) => `<option value="${rol}">${rol}</option>`).join('')}
-              </select>
-            </label>
-            <label>Categoría
-              <select name="categoriaRol">
-                ${categoriasRol.map((categoria) => `<option value="${categoria}">${categoria}</option>`).join('')}
-              </select>
-            </label>
             <label>Actores de doblaje (Opcional)
               <select name="actor_de_doblaje" multiple size="${Math.max(4, Math.min(collectionActors.length + 1, 8))}">
                 <option value="Sin actor">Sin actor</option>
@@ -4099,18 +4087,6 @@
           </label>
           <label>Buscar actor
             <input id="searchActor" type="search" value="${state.search.actor}" placeholder="Ej. Mario Castañeda">
-          </label>
-          <label>Rol
-            <select id="filterRole">
-              <option value="todos">Todas</option>
-              ${roles.map((rol) => `<option value="${rol}" ${state.filters.rol === rol ? 'selected' : ''}>${rol}</option>`).join('')}
-            </select>
-          </label>
-          <label>Categoría
-            <select id="filterRoleCategory">
-              <option value="todos">Todas</option>
-              ${categoriasRol.map((categoria) => `<option value="${categoria}" ${state.filters.categoriaRol === categoria ? 'selected' : ''}>${categoria}</option>`).join('')}
-            </select>
           </label>
           <button id="clearFilters" class="neon-btn neon-action">Limpiar filtros</button>
         </aside>
@@ -4461,7 +4437,7 @@
       });
 
       document.getElementById('clearFilters').onclick = () => {
-        state.filters = { personaje: 'todos', actor: 'todos', rol: 'todos', categoriaRol: 'todos' };
+        state.filters = { personaje: 'todos', actor: 'todos' };
         state.search = { personaje: '', actor: '' };
         renderUniverseView();
       };
@@ -4483,8 +4459,6 @@
 
       document.getElementById('searchCharacter').oninput = (e) => { state.search.personaje = e.target.value; renderUniverseView(); };
       document.getElementById('searchActor').oninput = (e) => { state.search.actor = e.target.value; renderUniverseView(); };
-      document.getElementById('filterRole').onchange = (e) => { state.filters.rol = e.target.value; renderUniverseView(); };
-      document.getElementById('filterRoleCategory').onchange = (e) => { state.filters.categoriaRol = e.target.value; renderUniverseView(); };
 
       viewUniverse.querySelectorAll('[data-open-character]').forEach((btn) => {
         btn.addEventListener('click', (event) => {
@@ -4625,12 +4599,8 @@
       if (!normalizedCharacter) return;
 
       const characterVideos = VIDEOS.filter((item) => normalizeName(item.personaje || '') === normalizedCharacter);
-      const currentRole = getVideoRole(characterVideos[0]);
-      const currentRoleCategory = getVideoRoleCategory(characterVideos[0]);
       const currentUniverses = getCharacterUniverseList(focusedCharacter, { fallbackToUnassigned: false });
       const currentActors = [...new Set(characterVideos.map((item) => String(item.actor_de_doblaje || 'Sin actor').trim()).filter(Boolean))];
-      const roleOptions = [...ROLE_OPTIONS];
-      const roleCategoryOptions = [...ROLE_CATEGORY_OPTIONS];
       const actorOptions = getActorOptionsForIndiceFilters();
       const universeOptions = getUniverseOptionsForIndiceFilters();
       const currentActorsNormalized = new Set(currentActors.map((actorName) => normalizeName(actorName)));
@@ -4647,16 +4617,6 @@
               <div class="character-inline-editor__grid">
                 <label>Nombre del personaje
                   <input type="text" name="characterName" value="${escapeHtml(focusedCharacter)}" required>
-                </label>
-                <label>Rol
-                  <select name="characterRole">
-                    ${roleOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === currentRole ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
-                  </select>
-                </label>
-                <label>Categoría
-                  <select name="characterRoleCategory">
-                    ${roleCategoryOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === currentRoleCategory ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
-                  </select>
                 </label>
                 <label>Actores
                   ${renderCompactMultiSelect({
@@ -5661,19 +5621,16 @@
     function showIndiceCharacterPreview(item, anchorEl) {
       if (!item || !anchorEl) return;
       removeIndicePreviewPopover();
-      const previewRole = item?.rol
-        ? { rol: item.rol, categoriaRol: item.categoriaRol || 'B' }
-        : getVideoRoleCategory(item?.coverVideo || item || {});
+
       const popover = document.createElement('article');
       popover.id = 'characterPreviewPopover';
       popover.className = 'character-preview-popover';
       popover.dataset.locked = item.unlocked ? 'false' : 'true';
-      popover.style.setProperty('--preview-role', roleColorValue(item?.rol, item?.categoriaRol, item.rareza || 'Común'));
+
       popover.innerHTML = `
         <img src="${item.coverVideo ? getVideoThumbnail(item.coverVideo) : createPlaceholderCover(item.name)}" alt="Vista previa de ${item.name}">
         <div class="preview-meta">
           <h3>${item.name}</h3>
-          <p><span class="preview-field-label">Rol</span><span class="preview-field-value">${roleCategoryLabel(previewRole.rol, previewRole.categoriaRol)}</span></p>
           <p><span class="preview-field-label">Actores</span><span class="preview-field-value">${item.actors.length ? item.actors.join(', ') : 'Sin actores asociados'}</span></p>
           <p><span class="preview-field-label">Universos</span><span class="preview-field-value">${item.universes.length ? item.universes.join(', ') : 'Sin universo'}</span></p>
         </div>
@@ -5761,19 +5718,6 @@
       const cardName = String(item?.name || item?.characterName || '').trim();
       if (!cardName) return '';
       const locked = Boolean(options.locked ?? !item?.unlocked);
-      const roleData = item?.rol
-        ? { rol: item.rol, categoriaRol: item.categoriaRol || 'B' }
-        : getVideoRoleCategory(item?.coverVideo || item || {});
-      const roleLabel = roleCategoryLabel(roleData.rol, roleData.categoriaRol);
-      const rarityValue = String(item?.rareza || item?.coverVideo?.rareza || 'Común');
-      const roleTier = roleTierFromData(item?.rol, item?.categoriaRol, rarityValue);
-      const [roleName, roleCategory] = roleTier.split('-');
-      const roleFilterData = {
-        role: roleName || 'recurrente',
-        category: roleCategory || 'a',
-        tier: roleTier
-      };
-      const glowColor = roleColorValue(item?.rol, item?.categoriaRol, rarityValue);
       const floatDelay = options.floatDelay || `-${(Math.random() * 2.6).toFixed(2)}s`;
 
       const renderMedia = () => {
@@ -5804,16 +5748,12 @@
           type="button"
           class="character-gallery-card"
           data-open-character="${cardName}"
-          data-role="${roleFilterData.role}"
-          data-role-category="${roleFilterData.category}"
-          data-role-tier="${roleFilterData.tier}"
           data-locked="${locked ? 'true' : 'false'}"
-          style="--role-glow:${glowColor}; --float-delay:${floatDelay};"
+          style="--float-delay:${floatDelay};"
         >
           ${renderMedia()}
           <div class="meta">
             <h3>${cardName}</h3>
-            <p class="meta">${escapeHtml(roleLabel)}</p>
           </div>
         </button>
       `;
@@ -5828,8 +5768,7 @@
         // Datos del personaje
         const normalizedCharacter = normalizeName(focusedCharacter);
         const charVideos = VIDEOS.filter(v => normalizeName(v.personaje || '') === normalizedCharacter);
-        const rol = getVideoRole(charVideos[0]);
-        const categoriaRol = getVideoRoleCategory(charVideos[0]);
+
         const universos = getCharacterUniverseList(focusedCharacter, { fallbackToUnassigned: false });
         const realVideos = charVideos.filter(v => hasGreetingVideo(v));
         
@@ -5840,8 +5779,6 @@
         const actorCards = [...unlockedActors, ...lockedActors]
           .map(item => ({ ...item, isUnlocked: !item.locked && hasGreetingVideo(item.video) }))
           .sort((a, b) => a.actorName.localeCompare(b.actorName, 'es', { sensitivity: 'base' }));
-        const roleOptions = [...ROLE_OPTIONS];
-        const roleCategoryOptions = [...ROLE_CATEGORY_OPTIONS];
         const actorOptions = getActorOptionsForIndiceFilters();
         const universeOptions = [...new Set([
           ...getUniverseOptionsForIndiceFilters(),
@@ -5883,8 +5820,6 @@
               <div class="character-hero__content">
                 <h2 class="section-title detail-character character-hero__title">${focusedCharacter}</h2>
                 <div class="detail-meta character-hero__badges">
-                  <span class="badge character-hero__badge">🎭 ${rol}</span>
-                  <span class="badge character-hero__badge">🏷️ ${categoriaRol}</span>
                   ${universos.map((universe) => {
                     const universeLabel = String(universe || '').trim() || SPECIAL_UNASSIGNED_UNIVERSE;
                     return `<button type="button" class="badge character-hero__badge character-hero__badge--universes character-hero__badge--universe-red character-hero__badge--universe-link" data-open-universe-profile="${escapeHtml(universeLabel)}" aria-label="Abrir perfil del universo ${escapeHtml(universeLabel)}"><span class="character-hero__universe-name">${escapeHtml(universeLabel)}</span></button>`;
@@ -5902,16 +5837,6 @@
               <div class="character-inline-editor__grid">
                 <label>Nombre del personaje
                   <input type="text" name="characterName" value="${focusedCharacter}">
-                </label>
-                <label>Rol
-                  <select name="characterRole">
-                    ${roleOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === rol ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
-                  </select>
-                </label>
-                <label>Categoría
-                  <select name="characterRoleCategory">
-                    ${roleCategoryOptions.map((option) => `<option value="${escapeHtml(option)}" ${option === categoriaRol ? 'selected' : ''}>${escapeHtml(option)}</option>`).join('')}
-                  </select>
                 </label>
                 <label>Actores
                   ${renderCompactMultiSelect({
@@ -6129,7 +6054,7 @@
             const universeName = String(btn.dataset.openUniverseProfile || '').trim();
             if (!universeName) return;
             state.universe = universeName;
-            state.filters = { personaje: 'todos', actor: 'todos', rol: 'todos', categoriaRol: 'todos' };
+            state.filters = { personaje: 'todos', actor: 'todos' };
             changeView('universe');
           });
         });
@@ -6193,20 +6118,8 @@
       )].sort((a, b) => a.localeCompare(b, 'es', { sensitivity: 'base' }));
       const indexUniverseFilters = getUniverseOptionsForIndiceFilters();
       const indexActorFilters = getActorOptionsForIndiceFilters();
-      const roleGroupLabels = {
-        'Protagonista A': 'Protagonista A',
-        'Protagonista B': 'Protagonista B',
-        'Villano A': 'Villano A',
-        'Secundario B': 'Secundario B',
-        Bloqueado: 'Bloqueado'
-      };
-      const groupedIndexItems = indexItems.reduce((acc, item) => {
-        const roleLabel = roleCategoryLabel(item.rol, item.categoriaRol);
-        if (!acc.has(roleLabel)) acc.set(roleLabel, []);
-        acc.get(roleLabel).push(item);
-        return acc;
-      }, new Map());
-      const roleRenderOrder = ['Protagonista A', 'Protagonista B', 'Villano A', 'Secundario B', 'Bloqueado'];
+      const groupedIndexItems = new Map();
+      groupedIndexItems.set('Personajes', indexItems);
       viewIndice.innerHTML = `
         <section class="mock-shell">
           <div class="indice-toolbar">
@@ -6217,16 +6130,6 @@
             <form id="addCharacterForm" class="add-character-form">
               <label>Nombre del personaje
                 <input type="text" name="characterName" placeholder="Ej. Homero Simpson" required>
-              </label>
-              <label>Rol
-                <select name="characterRole">
-                  ${ROLE_OPTIONS.map((option) => `<option value="${option}">${option}</option>`).join('')}
-                </select>
-              </label>
-              <label>Categoría
-                <select name="characterRoleCategory">
-                  ${ROLE_CATEGORY_OPTIONS.map((option) => `<option value="${option}">${option}</option>`).join('')}
-                </select>
               </label>
               <label>Actores de doblaje (opcional)
                 ${renderCompactMultiSelect({
@@ -6269,22 +6172,7 @@
           </div>
           <section class="characters-gallery">
             ${indexItems.length
-              ? roleRenderOrder
-                .filter((roleLabel) => groupedIndexItems.has(roleLabel))
-                .map((roleLabel) => `
-                  <button
-                    type="button"
-                    class="indice-group-divider indice-group-toggle"
-                    data-toggle-rarity="${roleLabel}"
-                    aria-expanded="${state.indiceCollapsedRarities.has(roleLabel) ? 'false' : 'true'}"
-                  >
-                    <span>${roleGroupLabels[roleLabel] || roleLabel}</span>
-                    <span class="indice-group-toggle-icon">${state.indiceCollapsedRarities.has(roleLabel) ? '▸' : '▾'}</span>
-                  </button>
-                  ${state.indiceCollapsedRarities.has(roleLabel)
-                    ? ''
-                    : groupedIndexItems.get(roleLabel).map(item => renderCharacterGalleryCard(item, { locked: !item.unlocked })).join('')}
-                `).join('')
+              ? groupedIndexItems.get('Personajes').map(item => renderCharacterGalleryCard(item, { locked: !item.unlocked })).join('')
               : '<p class="muted">No hay personajes cargados.</p>'}
           </section>
         </section>
@@ -6306,18 +6194,6 @@
         state.draftCharacterFeedback = '';
         if (!state.showAddCharacterForm) state.draftCharacterActors = [];
         renderIndiceView();
-      });
-      viewIndice.querySelectorAll('[data-toggle-rarity]').forEach((btn) => {
-        btn.addEventListener('click', () => {
-          const rarity = btn.dataset.toggleRarity;
-          if (!rarity) return;
-          if (state.indiceCollapsedRarities.has(rarity)) {
-            state.indiceCollapsedRarities.delete(rarity);
-          } else {
-            state.indiceCollapsedRarities.add(rarity);
-          }
-          renderIndiceView();
-        });
       });
       document.getElementById('addCharacterForm')?.addEventListener('submit', (event) => {
         event.preventDefault();
@@ -6653,20 +6529,7 @@
     }
 
     function renderRarezasView() {
-      const levels = [
-        ['Rol A', 'Categoría base'],
-        ['Rol B', 'Categoría avanzada'],
-        ['Rol C', 'Categoría élite'],
-        ['Rol D', 'Categoría máxima']
-      ];
-      viewRarezas.innerHTML = `
-        <section class="mock-shell toon-panel">
-          <h2 class="toon-title">Roles por nivel de energía</h2>
-          <div class="mock-row">
-            ${levels.map(([name, desc]) => `<article class="mock-box toon-panel"><h3 class="toon-title"><span class="toon-chip">${name}</span></h3><p class="muted">${desc}</p></article>`).join('')}
-          </div>
-        </section>
-      `;
+      viewRarezas.innerHTML = '';
     }
 
     function renderActoresView() {
@@ -7646,7 +7509,7 @@
       viewCollection.classList.toggle('active', next === 'collection');
       viewIndice.classList.toggle('active', next === 'indice');
       viewMaraton.classList.toggle('active', next === 'maraton');
-      viewRarezas.classList.toggle('active', next === 'rarezas');
+      viewRarezas.classList.remove('active');
       viewActores.classList.toggle('active', next === 'actores');
       viewVersiones.classList.toggle('active', next === 'versiones');
       viewAchievements.classList.toggle('active', next === 'achievements');
@@ -7681,7 +7544,7 @@
       if (next === 'achievements') renderAchievementsView();
       if (next === 'indice') renderIndiceView();
       if (next === 'maraton') renderMaratonView();
-      if (next === 'rarezas') renderRarezasView();
+
       if (next === 'actores') renderActoresView();
       if (next === 'versiones') renderVersionesView();
       if (next === 'favoritos') renderFavoritosView();
