@@ -2699,7 +2699,7 @@
         let maxX = node.x + NODE_HALF_WIDTH;
         let minY = node.y - NODE_HALF_HEIGHT;
         let maxY = node.y + NODE_HALF_HEIGHT;
-        if (isUniverseExpandedOnMap(node)) {
+        if (state.expandedUniverses.has(node.id)) {
           const worldCount = getUniverseWorldEntries(node.name).length;
           const orbitRadius = getWorldOrbitRadius(worldCount);
           if (orbitRadius > 0) {
@@ -2903,21 +2903,6 @@
       }
 
       return entries.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
-    }
-
-    function hasFavoriteDirectChildWorld(parentNodeId) {
-      const normalizedParentId = String(parentNodeId || '').trim();
-      if (!normalizedParentId) return false;
-      return Object.entries(state.universeMemberships || {}).some(([childId, parentId]) => {
-        if (String(parentId || '').trim() !== normalizedParentId) return false;
-        const childNode = state.universeNodes.find((node) => node.id === childId);
-        return Boolean(childNode?.isFavorite);
-      });
-    }
-
-    function isUniverseExpandedOnMap(universeNode) {
-      if (!universeNode?.id) return false;
-      return state.expandedUniverses.has(universeNode.id) || hasFavoriteDirectChildWorld(universeNode.id);
     }
 
     function getConnectorVariant(seedKey) {
@@ -3265,9 +3250,8 @@
         const worldEls = [...viewMap.querySelectorAll('.universe-node--world[data-parent-id]')];
         worldEls.forEach((worldEl) => {
           const parentNodeId = worldEl.dataset.parentId || '';
-          if (!parentNodeId) return;
+          if (!parentNodeId || !state.expandedUniverses.has(parentNodeId)) return;
           const parentNode = state.universeNodes.find((item) => item.id === parentNodeId);
-          if (!isUniverseExpandedOnMap(parentNode)) return;
           if (!parentNode) return;
           const baseAngle = Number.parseFloat(worldEl.dataset.baseAngle || '0');
           const baseDx = Number.parseFloat(worldEl.dataset.baseDx || '');
@@ -3342,7 +3326,7 @@
           : '';
         const nodesMarkup = rootUniverseNodes.map(node => {
           const universeData = universes[normalizeUniverseName(node.name)] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
-          const isExpanded = isUniverseExpandedOnMap(node);
+          const isExpanded = state.expandedUniverses.has(node.id);
           if (isExpanded) {
             const entries = getUniverseWorldEntries(node.name)
               .map((entry) => ({ ...entry, type: 'universe-child', worldKey: `universe-child:${entry.id || normalizeUniverseName(entry.name)}` }));
