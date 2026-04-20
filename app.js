@@ -894,6 +894,22 @@
       );
     }
 
+    function applyFavoriteFlagsToUniverseNodes(favoriteUniverseNames = []) {
+      const normalizedFavorites = new Set(
+        (Array.isArray(favoriteUniverseNames) ? favoriteUniverseNames : [])
+          .map((name) => normalizeUniverseName(name))
+          .filter(Boolean)
+      );
+      if (!normalizedFavorites.size) return;
+      (state.universeNodes || []).forEach((node) => {
+        if (!node?.name) return;
+        if (normalizedFavorites.has(normalizeUniverseName(node.name))) {
+          node.isFavorite = true;
+        }
+      });
+      syncFavoriteUniverseSetFromNodes();
+    }
+
     function getUniverseParentId(nodeId) {
       const normalizedId = String(nodeId || '').trim();
       if (!normalizedId) return '';
@@ -2378,12 +2394,17 @@
         const localUniversesUpdatedAt = getLocalUniversesUpdatedAt();
 
         if (data.universeNodes && remoteUpdatedAt >= localUniversesUpdatedAt) {
-          state.universeNodes = normalizeUniverseNodes(
-            Object.entries(data.universeNodes).map(([id, val]) => ({ id, ...val }))
-          );
+          const remoteUniverseNodeRows = Array.isArray(data.universeNodes)
+            ? data.universeNodes
+            : Object.entries(data.universeNodes).map(([id, val]) => ({ id, ...val }));
+          state.universeNodes = normalizeUniverseNodes(remoteUniverseNodeRows);
           localStorage.setItem(UNIVERSES_STORAGE_KEY, JSON.stringify(state.universeNodes));
           localStorage.setItem(UNIVERSES_UPDATED_AT_KEY, String(remoteUpdatedAt || Date.now()));
           syncFavoriteUniverseSetFromNodes();
+        }
+        if (Array.isArray(data.favoriteUniverses)) {
+          applyFavoriteFlagsToUniverseNodes(data.favoriteUniverses);
+          localStorage.setItem(UNIVERSES_STORAGE_KEY, JSON.stringify(state.universeNodes));
         }
         if (data.universeMemberships && typeof data.universeMemberships === 'object') {
           state.universeMemberships = normalizeUniverseMemberships(data.universeMemberships);
@@ -2483,7 +2504,13 @@
           videos: VIDEOS,
           collectionModel,
           audioLibrary: collectionModel.audioLibrary,
-          blockedCharactersByActor: state.blockedCharactersByActor
+          blockedCharactersByActor: state.blockedCharactersByActor,
+          favoriteUniverses: [...new Set(
+            (state.universeNodes || [])
+              .filter((node) => node?.isFavorite)
+              .map((node) => String(node.name || '').trim())
+              .filter(Boolean)
+          )]
         });
       } catch (err) {
         console.warn('No se pudo guardar en Firebase.', err);
@@ -3262,7 +3289,6 @@
         let best = null;
         state.universeNodes.forEach((candidateNode) => {
           if (!candidateNode || candidateNode.id === activeNode.id) return;
-          if (getUniverseParentId(candidateNode.id)) return;
           const dx = candidateNode.x - activeNode.x;
           const dy = candidateNode.y - activeNode.y;
           const centerDistance = Math.hypot(dx, dy);
@@ -3946,7 +3972,7 @@
         .map((parentId) => state.universeNodes.find((node) => node.id === parentId)?.name || '')
         .filter(Boolean);
       const parentUniverseOptions = state.universeNodes
-        .filter((node) => node.id !== universeNode?.id && String(node.kind || 'universe') === 'universe')
+        .filter((node) => node.id !== universeNode?.id)
         .sort((a, b) => String(a.name || '').localeCompare(String(b.name || ''), 'es', { sensitivity: 'base' }));
       const headerCover = getSafeUniverseCover(state.universe, universeNode?.cover || getUniverseCover(videos));
       const progressVisual = getProgressVisual(universeData.completion);
@@ -4270,7 +4296,6 @@
             const selectedParentUniverseIds = linkedUniverseNames
               .map((linkedName) => state.universeNodes.find((node) =>
                 node.id !== universeNode.id
-                && String(node.kind || 'universe') === 'universe'
                 && normalizeUniverseName(node.name) === normalizeUniverseName(linkedName)
               ))
               .filter(Boolean)
