@@ -2919,6 +2919,29 @@
       return entries.sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
     }
 
+    function sanitizeExpandedUniverses() {
+      if (!(state.expandedUniverses instanceof Set)) {
+        state.expandedUniverses = new Set();
+        return;
+      }
+      const childUniverseIds = new Set(Object.keys(state.universeMemberships || {}));
+      const rootUniverseNodeIds = new Set(
+        state.universeNodes
+          .filter((node) => !childUniverseIds.has(node.id) || node.isFavorite === true)
+          .map((node) => node.id)
+      );
+      state.expandedUniverses.forEach((nodeId) => {
+        if (!rootUniverseNodeIds.has(nodeId)) {
+          state.expandedUniverses.delete(nodeId);
+          return;
+        }
+        const worldCount = getUniverseWorldEntriesById(nodeId).length;
+        if (!worldCount) {
+          state.expandedUniverses.delete(nodeId);
+        }
+      });
+    }
+
     function getConnectorVariant(seedKey) {
       const hash = Math.abs(hashCode(String(seedKey || 'connector')));
       const curveStrength = 0.16 + ((hash % 35) / 100);
@@ -3186,6 +3209,7 @@
           node.kind = remainingParentIds.length ? 'world' : 'universe';
           changed = true;
         });
+        if (changed) state.expandedUniverses.delete(parentUniverseId);
         return changed;
       };
 
@@ -3322,6 +3346,7 @@
       const renderMapWorldContent = () => {
         const universes = groupByUniverse();
         ensureUniverseNodes();
+        sanitizeExpandedUniverses();
         syncFavoriteUniverseSetFromNodes();
         const worldNodes = [];
         const worldLinks = [];
