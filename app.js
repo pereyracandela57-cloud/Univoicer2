@@ -942,10 +942,25 @@
       return false;
     }
 
-    function nodeHasChildren(nodeId) {
-      const normalizedId = String(nodeId || '').trim();
-      if (!normalizedId) return false;
-      return state.universeNodes.some((node) => getUniverseParentId(node.id) === normalizedId);
+    function getUniverseSubtreeIds(rootNodeId) {
+      const normalizedRootId = String(rootNodeId || '').trim();
+      if (!normalizedRootId) return [];
+      const subtreeIds = [];
+      const queue = [normalizedRootId];
+      const visited = new Set();
+      while (queue.length) {
+        const currentId = queue.shift();
+        if (!currentId || visited.has(currentId)) continue;
+        visited.add(currentId);
+        subtreeIds.push(currentId);
+        state.universeNodes.forEach((node) => {
+          if (!node?.id || visited.has(node.id)) return;
+          if (getUniverseParentId(node.id) === currentId) {
+            queue.push(node.id);
+          }
+        });
+      }
+      return subtreeIds;
     }
 
     function normalizeUniverseMemberships(memberships, nodes = state.universeNodes) {
@@ -3697,14 +3712,14 @@
           if (!didMove) return;
           let membershipsChanged = false;
           if (activeNodeId && targetNodeId && activeNodeId !== targetNodeId) {
-            if (wouldCreateUniverseCycle(activeNodeId, targetNodeId)) {
-              alert('No se puede crear una relación cíclica entre universos.');
+            const subtreeIds = getUniverseSubtreeIds(activeNodeId);
+            const createsCycleInSubtree = subtreeIds.some((nodeId) => wouldCreateUniverseCycle(nodeId, targetNodeId));
+            if (createsCycleInSubtree) {
+              alert('Se permite absorber universos con hijos, pero este movimiento fue cancelado porque crearía un ciclo en el árbol.');
             } else {
               const activeNode = state.universeNodes.find(item => item.id === activeNodeId);
               const targetNode = state.universeNodes.find(item => item.id === targetNodeId);
-              if (activeNode && nodeHasChildren(activeNodeId)) {
-                alert('No se puede convertir en mundo un universo que ya tiene hijos.');
-              } else if (activeNode) {
+              if (activeNode) {
                 if (state.universeMemberships[activeNodeId] !== targetNodeId) {
                   state.universeMemberships[activeNodeId] = targetNodeId;
                   membershipsChanged = true;
