@@ -2700,7 +2700,7 @@
         let minY = node.y - NODE_HALF_HEIGHT;
         let maxY = node.y + NODE_HALF_HEIGHT;
         if (state.expandedUniverses.has(node.id)) {
-          const worldCount = getUniverseWorldEntries(node.name).length;
+          const worldCount = getUniverseWorldEntriesById(node.id).length;
           const orbitRadius = getWorldOrbitRadius(worldCount);
           if (orbitRadius > 0) {
             minX = Math.min(minX, node.x - orbitRadius - WORLD_NODE_HALF_WIDTH);
@@ -2855,10 +2855,10 @@
       saveUniverseNodes();
     }
 
-    function getUniverseChildWorldEntries(universeName) {
-      const parentNode = state.universeNodes.find((node) => normalizeUniverseName(node.name) === normalizeUniverseName(universeName));
+    function getUniverseChildWorldEntriesById(parentNodeId) {
+      const parentNode = state.universeNodes.find((node) => node.id === parentNodeId);
       if (!parentNode) return [];
-      const byChildName = new Map();
+      const byChildId = new Map();
       const universeMap = groupByUniverse();
       Object.entries(state.universeMemberships || {}).forEach(([childId, parentId]) => {
         if (parentId !== parentNode.id) return;
@@ -2868,8 +2868,8 @@
         if (!childName) return;
         const childKey = normalizeUniverseName(childName);
         const childUniverseData = universeMap[childKey] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
-        if (!byChildName.has(childKey)) {
-          byChildName.set(childKey, {
+        if (!byChildId.has(childId)) {
+          byChildId.set(childId, {
             id: childNode.id,
             name: childName,
             cover: childNode.cover || '',
@@ -2878,20 +2878,19 @@
           });
         }
       });
-      return [...byChildName.values()].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
+      return [...byChildId.values()].sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }));
     }
 
-    function getUniverseWorldEntries(universeName) {
-      const entries = getUniverseChildWorldEntries(universeName);
-      const parentNode = state.universeNodes.find((node) => normalizeUniverseName(node.name) === normalizeUniverseName(universeName));
+    function getUniverseWorldEntriesById(parentNodeId) {
+      const entries = getUniverseChildWorldEntriesById(parentNodeId);
+      const parentNode = state.universeNodes.find((node) => node.id === parentNodeId);
       if (!parentNode) return entries;
 
       const parentUniverseData = groupByUniverse()[normalizeUniverseName(parentNode.name)];
       const hasOwnCharacters = (parentUniverseData?.totalCharacters || 0) > 0;
       if (!hasOwnCharacters) return entries;
 
-      const parentKey = normalizeUniverseName(parentNode.name);
-      const alreadyIncluded = entries.some((entry) => normalizeUniverseName(entry.name) === parentKey);
+      const alreadyIncluded = entries.some((entry) => entry.id === parentNode.id);
       if (!alreadyIncluded) {
         entries.push({
           id: parentNode.id,
@@ -3328,7 +3327,7 @@
           const universeData = universes[normalizeUniverseName(node.name)] || { totalCharacters: 0, unlockedCharacters: 0, completion: 0, state: 'incomplete' };
           const isExpanded = state.expandedUniverses.has(node.id);
           if (isExpanded) {
-            const entries = getUniverseWorldEntries(node.name)
+            const entries = getUniverseWorldEntriesById(node.id)
               .map((entry) => ({ ...entry, type: 'universe-child', worldKey: `universe-child:${entry.id || normalizeUniverseName(entry.name)}` }));
             const worldCount = entries.length;
             const orbitRadius = getWorldOrbitRadius(worldCount);
@@ -3340,7 +3339,7 @@
               const safeX = Math.round(worldX - WORLD_NODE_HALF_WIDTH);
               const safeY = Math.round(worldY - WORLD_NODE_HALF_HEIGHT);
               const safeWorldName = escapeHtml(entry.name);
-              const worldNodeId = entry.id || state.universeNodes.find((item) => normalizeUniverseName(item.name) === normalizeUniverseName(entry.name))?.id || '';
+              const worldNodeId = entry.id || '';
               const floatDelay = ((Math.abs(hashCode(`${entry.id || entry.name}-${index}`)) % 24) / 10).toFixed(1);
               const worldCenterX = worldX;
               const worldCenterY = worldY;
@@ -3781,7 +3780,7 @@
             state.expandedUniverses.add(clickedNodeId);
             const clickedNode = state.universeNodes.find((item) => item.id === clickedNodeId);
             if (clickedNode) {
-              const orbitRadius = getWorldOrbitRadius(getUniverseWorldEntries(clickedNode.name).length);
+              const orbitRadius = getWorldOrbitRadius(getUniverseWorldEntriesById(clickedNode.id).length);
               if (orbitRadius > 0) {
                 const marginX = orbitRadius + WORLD_NODE_HALF_WIDTH;
                 const marginY = orbitRadius + WORLD_NODE_HALF_HEIGHT;
