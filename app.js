@@ -3343,6 +3343,7 @@
           const isExpanded = state.expandedUniverses.has(node.id);
           if (isExpanded) {
             const entries = getUniverseWorldEntriesById(node.id)
+              .filter((entry) => entry.id !== node.id)
               .map((entry) => ({ ...entry, type: 'universe-child', worldKey: `universe-child:${entry.id || normalizeUniverseName(entry.name)}` }));
             const worldCount = entries.length;
             const orbitRadius = getWorldOrbitRadius(worldCount);
