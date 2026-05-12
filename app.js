@@ -7048,16 +7048,13 @@
               </div>
               <div class="profile-edit-block">
                 <h5>Audios</h5>
-                <label>Mezcla guardada del personaje
-                  <select id="characterMixInlineSelect" class="control-input">
-                    <option value="">Sin mezcla asignada</option>
-                    ${getAssignableMixesForCharacter(focusedCharacterModel?.id || '').map((mix) => {
-                      const mixId = String(mix?.id || '').trim();
-                      const selected = mixId && mixId === String(focusedCharacterModel?.assignedMixAudioId || '').trim();
-                      return `<option value="${escapeHtml(mixId)}" ${selected ? 'selected' : ''}>${escapeHtml(mix?.name || 'Mezcla sin nombre')}</option>`;
-                    }).join('')}
-                  </select>
-                </label>
+                <div class="profile-mix-inline profile-mix-inline--compact">
+                  <h6 class="profile-mix-inline__title">Mezcla guardada del personaje</h6>
+                  <div class="profile-mix-inline__actions">
+                    <button type="button" id="playCharacterMixInlineBtn" class="neon-btn toon-btn toon-btn--primary profile-mix-inline__play" ${focusedAssignedMix ? '' : 'disabled'} title="Escuchar mezcla asignada" aria-label="Escuchar mezcla asignada">▶</button>
+                    <button type="button" id="clearCharacterMixInlineBtn" class="neon-btn toon-btn toon-btn--danger profile-mix-inline__clear" ${focusedAssignedMix ? '' : 'disabled'} title="Quitar mezcla asignada" aria-label="Quitar mezcla asignada">✖</button>
+                  </div>
+                </div>
                 ${focusedAssignedMix ? '<p class="muted">Con mezcla asignada, solo se mostrará y descargará la mezcla (más imágenes).</p>' : `
                   <label>Voz
                     <select id="characterVoiceInlineSelect" class="control-input">
@@ -7161,27 +7158,33 @@
             feedback.textContent = nextBackgroundId ? 'Fondo asignado correctamente.' : 'Fondo removido.';
           }
         });
-        document.getElementById('characterMixInlineSelect')?.addEventListener('change', (event) => {
-          const nextMixId = String(event.target?.value || '').trim();
-          const characterId = String(focusedCharacterModel?.id || '').trim();
-            const assignableMixes = getAssignableMixesForCharacter(characterId);
+        document.getElementById('playCharacterMixInlineBtn')?.addEventListener('click', async () => {
           const feedback = document.getElementById('indiceCharacterFeedback');
-          if (nextMixId && !assignableMixes.some((mix) => String(mix?.id || '').trim() === nextMixId)) {
+          if (!focusedAssignedMix) return;
+          try {
+            await playAudioLibraryItemPreview(focusedAssignedMix);
+            if (feedback) {
+              feedback.style.color = '#9ff7c8';
+              feedback.textContent = `Reproduciendo mezcla: ${focusedAssignedMix.name || 'Mezcla sin nombre'}.`;
+            }
+          } catch (error) {
             if (feedback) {
               feedback.style.color = '#ffb6b6';
-              feedback.textContent = 'Esa mezcla ya está asignada a otro personaje.';
+              feedback.textContent = error?.message || 'No se pudo reproducir la mezcla asignada.';
             }
-            event.target.value = String(focusedCharacterModel?.assignedMixAudioId || '');
-            return;
           }
+        });
+        document.getElementById('clearCharacterMixInlineBtn')?.addEventListener('click', () => {
+          const feedback = document.getElementById('indiceCharacterFeedback');
           if (focusedCharacterModel) {
-            focusedCharacterModel.assignedMixAudioId = nextMixId;
+            focusedCharacterModel.assignedMixAudioId = '';
             saveCollectionModel();
           }
           if (feedback) {
             feedback.style.color = '#9ff7c8';
-            feedback.textContent = nextMixId ? 'Mezcla asignada correctamente.' : 'Mezcla removida.';
+            feedback.textContent = 'Mezcla removida.';
           }
+          renderIndiceView();
         });
         document.getElementById('characterVoiceInlineSelect')?.addEventListener('change', (event) => {
           const selectedVoiceId = String(event.target?.value || '').trim();
