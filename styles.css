@@ -4987,3 +4987,28 @@
 .universe-background-option small {
   color: rgba(220, 237, 255, .72);
 }
+
+.audio-mixer-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: .9rem;
+  align-items: start;
+}
+
+.audio-mixer-section {
+  display: grid;
+  gap: .55rem;
+  padding: .75rem;
+  border: 1px solid rgba(143, 220, 255, .35);
+  border-radius: .75rem;
+  background: rgba(8, 18, 43, .55);
+}
+
+.audio-mixer-section h4 {
+  margin: 0;
+}
+
+.audio-mixer-section label {
+  display: grid;
+  gap: .3rem;
+}
