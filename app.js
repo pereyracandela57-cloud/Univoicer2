@@ -6815,6 +6815,7 @@
         const focusedCharacterModel = (collectionModel.characters || [])
           .find((character) => normalizeName(character?.name || '') === normalizeName(focusedCharacter));
         const focusedAssignedMix = getAssignedMixForCharacterId(focusedCharacterModel?.id || '');
+        const focusedCharacterMedia = getCharacterMedia(focusedCharacterModel?.id || focusedCharacterId || focusedCharacter);
 
         const profileAvatarMarkup = isCharacterLocked
           ? `
@@ -6928,8 +6929,26 @@
               <h4 class="profile-section__title">📦 Multimedia del personaje</h4>
               <p class="muted">${focusedAssignedMix ? `Mezcla asignada: ${escapeHtml(focusedAssignedMix.name || 'Mezcla sin nombre')}.` : 'Sin mezcla asignada.'}</p>
               <div class="actions">
+                <button type="button" class="neon-btn toon-btn" id="toggleCharacterImageUrlForm">Agregar imagen</button>
                 <button type="button" class="neon-btn toon-btn" data-download-character-multimedia ${focusedAssignedMix ? '' : 'disabled'}>Descargar multimedia</button>
               </div>
+              <form id="characterImageUrlInlineForm" class="character-image-url-form" hidden>
+                <label>URL de imagen
+                  <input id="characterImageUrlInlineInput" type="url" class="control-input" placeholder="https://..." autocomplete="off">
+                </label>
+                <button type="submit" class="neon-btn neon-btn--primary">Guardar</button>
+              </form>
+              <section class="character-media-preview-grid">
+                ${focusedCharacterMedia.imageUrls.map((url, index) => `
+                  <article class="character-media-preview-card">
+                    <img src="${escapeHtml(url)}" alt="Imagen multimedia ${index + 1} de ${escapeHtml(focusedCharacter)}" loading="lazy">
+                    <div class="actions">
+                      <a href="${escapeHtml(url)}" class="neon-btn" target="_blank" rel="noopener">Abrir</a>
+                      <button type="button" class="neon-btn toon-btn toon-btn--danger" data-delete-indice-character-image="${index}">Eliminar</button>
+                    </div>
+                  </article>
+                `).join('') || '<p class="muted">Sin imágenes guardadas.</p>'}
+              </section>
             </article>
 
             <article class="profile-section">
@@ -6981,6 +7000,58 @@
               feedback.textContent = err?.message || 'No se pudo descargar la multimedia.';
             }
           }
+        });
+        document.getElementById('toggleCharacterImageUrlForm')?.addEventListener('click', () => {
+          const form = document.getElementById('characterImageUrlInlineForm');
+          if (!form) return;
+          const willShow = form.hidden;
+          form.hidden = !willShow;
+          if (willShow) document.getElementById('characterImageUrlInlineInput')?.focus();
+        });
+        document.getElementById('characterImageUrlInlineForm')?.addEventListener('submit', (event) => {
+          event.preventDefault();
+          const input = document.getElementById('characterImageUrlInlineInput');
+          const imageUrl = String(input?.value || '').trim();
+          if (!imageUrl) {
+            const feedback = document.getElementById('indiceCharacterFeedback');
+            if (feedback) {
+              feedback.style.color = '#ffb6b6';
+              feedback.textContent = 'Debes ingresar una URL de imagen.';
+            }
+            return;
+          }
+          try {
+            new URL(imageUrl, window.location.href);
+          } catch (_) {
+            const feedback = document.getElementById('indiceCharacterFeedback');
+            if (feedback) {
+              feedback.style.color = '#ffb6b6';
+              feedback.textContent = 'La URL de imagen no es válida.';
+            }
+            return;
+          }
+          const nextImageUrls = [...new Set([...(focusedCharacterMedia.imageUrls || []), imageUrl])];
+          saveCharacterMedia(focusedCharacterModel?.id || focusedCharacterId || focusedCharacter, { imageUrls: nextImageUrls });
+          renderIndiceView();
+          const feedback = document.getElementById('indiceCharacterFeedback');
+          if (feedback) {
+            feedback.style.color = '#9ff7c8';
+            feedback.textContent = 'Imagen agregada a la multimedia.';
+          }
+        });
+        viewIndice.querySelectorAll('[data-delete-indice-character-image]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const index = Number(btn.dataset.deleteIndiceCharacterImage);
+            if (!Number.isInteger(index) || index < 0) return;
+            const nextImageUrls = (focusedCharacterMedia.imageUrls || []).filter((_, currentIndex) => currentIndex !== index);
+            saveCharacterMedia(focusedCharacterModel?.id || focusedCharacterId || focusedCharacter, { imageUrls: nextImageUrls });
+            renderIndiceView();
+            const feedback = document.getElementById('indiceCharacterFeedback');
+            if (feedback) {
+              feedback.style.color = '#9ff7c8';
+              feedback.textContent = 'Imagen eliminada de la multimedia.';
+            }
+          });
         });
 
         // EDICIÓN AVANZADA
