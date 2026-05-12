@@ -2253,6 +2253,26 @@
       return getAudioLibraryMixById(character?.assignedMixAudioId || '');
     }
 
+    function getAssignedMixMapByCharacterId() {
+      const assignments = new Map();
+      (collectionModel.characters || []).forEach((character) => {
+        const characterId = String(character?.id || '').trim();
+        const mixId = String(character?.assignedMixAudioId || '').trim();
+        if (characterId && mixId) assignments.set(characterId, mixId);
+      });
+      return assignments;
+    }
+
+    function getAssignableMixesForCharacter(characterId) {
+      const mixes = Array.isArray(state.audioLibrary?.mezclas) ? state.audioLibrary.mezclas : [];
+      const takenByOtherCharacters = new Set(
+        [...getAssignedMixMapByCharacterId().entries()]
+          .filter(([ownerId]) => ownerId !== String(characterId || '').trim())
+          .map(([, mixId]) => mixId)
+      );
+      return mixes.filter((mix) => !takenByOtherCharacters.has(String(mix?.id || '').trim()));
+    }
+
     async function downloadUrlAsFile(url, fileName) {
       const cleanUrl = String(url || '').trim();
       if (!cleanUrl) throw new Error('No hay URL descargable para este audio.');
@@ -2291,6 +2311,50 @@
         return `Descargando mezcla asignada: ${assignedMix.name || 'Mezcla'}.`;
       }
       throw new Error('Este personaje todavía no tiene una mezcla asignada para descargar.');
+    }
+
+    function openAssignCharacterMixModal(characterId, { onAssigned } = {}) {
+      const character = getCharacterById(characterId);
+      if (!character) return;
+      const assignableMixes = getAssignableMixesForCharacter(characterId);
+      const currentMixId = String(character.assignedMixAudioId || '').trim();
+      const modal = document.createElement('section');
+      modal.className = 'detail-modal';
+      modal.innerHTML = `
+        <article class="detail-content">
+          <h3 class="section-title">Designar audio</h3>
+          <p class="muted">Selecciona un audio de la galería para <strong>${escapeHtml(character.name || 'este personaje')}</strong>.</p>
+          <label>Audio disponible
+            <select class="control-input" data-character-mix-select>
+              <option value="">Sin audio asignado</option>
+              ${assignableMixes.map((mix) => `<option value="${escapeHtml(mix.id)}" ${mix.id === currentMixId ? 'selected' : ''}>${escapeHtml(mix.name || 'Mezcla sin nombre')}</option>`).join('')}
+            </select>
+          </label>
+          <p class="audio-library-feedback" aria-live="polite" data-character-mix-feedback></p>
+          <div class="actions">
+            <button type="button" class="neon-btn neon-btn--primary" data-confirm-character-mix>Confirmar</button>
+            <button type="button" class="neon-btn" data-cancel-character-mix>Cancelar</button>
+          </div>
+        </article>
+      `;
+      document.body.appendChild(modal);
+      const close = () => modal.remove();
+      modal.querySelector('[data-cancel-character-mix]')?.addEventListener('click', close);
+      modal.addEventListener('click', (event) => {
+        if (event.target === modal) close();
+      });
+      modal.querySelector('[data-confirm-character-mix]')?.addEventListener('click', () => {
+        const nextMixId = String(modal.querySelector('[data-character-mix-select]')?.value || '').trim();
+        const feedback = modal.querySelector('[data-character-mix-feedback]');
+        if (nextMixId && !assignableMixes.some((mix) => mix.id === nextMixId)) {
+          if (feedback) feedback.textContent = 'Ese audio ya está designado a otro personaje.';
+          return;
+        }
+        character.assignedMixAudioId = nextMixId;
+        saveCollectionModel();
+        if (typeof onAssigned === 'function') onAssigned(nextMixId);
+        close();
+      });
     }
 
     async function uploadMixedAudioBlob(blob, { voiceItem, backgroundItem } = {}) {
@@ -6928,6 +6992,7 @@
               <h4 class="profile-section__title">📦 Multimedia del personaje</h4>
               <p class="muted">${focusedAssignedMix ? `Mezcla asignada: ${escapeHtml(focusedAssignedMix.name || 'Mezcla sin nombre')}.` : 'Sin mezcla asignada.'}</p>
               <div class="actions">
+                <button type="button" class="neon-btn toon-btn" data-assign-character-audio>Designar audio</button>
                 <button type="button" class="neon-btn toon-btn" data-download-character-multimedia ${focusedAssignedMix ? '' : 'disabled'}>Descargar multimedia</button>
               </div>
             </article>
@@ -6981,6 +7046,21 @@
               feedback.textContent = err?.message || 'No se pudo descargar la multimedia.';
             }
           }
+        });
+        viewIndice.querySelector('[data-assign-character-audio]')?.addEventListener('click', () => {
+          const feedback = document.getElementById('indiceCharacterFeedback');
+          openAssignCharacterMixModal(focusedCharacterModel?.id || '', {
+            onAssigned: (nextMixId) => {
+              renderIndiceView();
+              const mixName = nextMixId ? (getAudioLibraryMixById(nextMixId)?.name || 'Audio') : 'ninguno';
+              if (feedback) {
+                feedback.style.color = '#9ff7c8';
+                feedback.textContent = nextMixId
+                  ? `Audio designado correctamente: ${mixName}.`
+                  : 'Audio desasignado correctamente.';
+              }
+            }
+          });
         });
 
         // EDICIÓN AVANZADA
