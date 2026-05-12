@@ -2039,13 +2039,13 @@
     }
 
     async function deleteAudioLibraryItem(category, audioId) {
-      const normalizedCategory = category === 'fondos' ? 'fondos' : 'voces';
+      const normalizedCategory = category === 'fondos' ? 'fondos' : category === 'mezclas' ? 'mezclas' : 'voces';
       const currentItems = Array.isArray(state.audioLibrary?.[normalizedCategory]) ? state.audioLibrary[normalizedCategory] : [];
       const targetItem = currentItems.find((item) => item.id === audioId);
       if (!targetItem) throw new Error('No encontramos el audio seleccionado.');
       if (!firebaseStorage) throw new Error('Firebase Storage no está disponible en esta sesión.');
 
-      const storagePath = String(targetItem.path || '').trim();
+      const storagePath = String(targetItem.path || targetItem.storagePath || '').trim();
       if (!storagePath) throw new Error('Este audio no tiene path de storage, no se puede eliminar.');
 
       await firebaseStorage.ref(storagePath).delete();
@@ -2054,7 +2054,7 @@
     }
 
     function renameAudioLibraryItem(category, audioId, nextName) {
-      const normalizedCategory = category === 'fondos' ? 'fondos' : 'voces';
+      const normalizedCategory = category === 'fondos' ? 'fondos' : category === 'mezclas' ? 'mezclas' : 'voces';
       const cleanName = String(nextName || '').trim();
       if (!cleanName) throw new Error('El nombre no puede quedar vacío.');
 
@@ -2625,14 +2625,14 @@
     }
 
     async function replaceAudioLibraryItemContent(category, audioId, blob) {
-      const normalizedCategory = category === 'fondos' ? 'fondos' : 'voces';
+      const normalizedCategory = category === 'fondos' ? 'fondos' : category === 'mezclas' ? 'mezclas' : 'voces';
       if (!firebaseStorage) throw new Error('Firebase Storage no está disponible en esta sesión.');
 
       const currentItems = Array.isArray(state.audioLibrary?.[normalizedCategory]) ? state.audioLibrary[normalizedCategory] : [];
       const targetIndex = currentItems.findIndex((item) => item.id === audioId);
       if (targetIndex < 0) throw new Error('No encontramos el audio seleccionado.');
       const targetItem = currentItems[targetIndex];
-      const storagePath = String(targetItem.path || '').trim();
+      const storagePath = String(targetItem.path || targetItem.storagePath || '').trim();
       if (!storagePath) throw new Error('Este audio no tiene path de storage, no se puede reemplazar.');
 
       const ref = firebaseStorage.ref(storagePath);
@@ -2658,7 +2658,7 @@
     }
 
     async function openAudioTrimEditorModal(category, audioId, options = {}) {
-      const normalizedCategory = category === 'fondos' ? 'fondos' : 'voces';
+      const normalizedCategory = category === 'fondos' ? 'fondos' : category === 'mezclas' ? 'mezclas' : 'voces';
       const persistInLibrary = options?.persistInLibrary !== false;
       const sourceAudioItem = options?.audioItem || null;
       const items = Array.isArray(state.audioLibrary?.[normalizedCategory]) ? state.audioLibrary[normalizedCategory] : [];
@@ -2933,7 +2933,7 @@
     }
 
     function openMarkAudioLibraryAsUsedModal(category, audioId) {
-      const normalizedCategory = category === 'fondos' ? 'fondos' : 'voces';
+      const normalizedCategory = category === 'fondos' ? 'fondos' : category === 'mezclas' ? 'mezclas' : 'voces';
       const items = Array.isArray(state.audioLibrary?.[normalizedCategory]) ? state.audioLibrary[normalizedCategory] : [];
       const audioItem = items.find((item) => item.id === audioId);
       if (!audioItem) return;
@@ -8703,7 +8703,7 @@
     }
 
     function openAssignAudioModal(category, audioId) {
-      const normalizedCategory = category === 'fondos' ? 'fondos' : 'voces';
+      const normalizedCategory = category === 'fondos' ? 'fondos' : category === 'mezclas' ? 'mezclas' : 'voces';
       const items = Array.isArray(state.audioLibrary?.[normalizedCategory]) ? state.audioLibrary[normalizedCategory] : [];
       const audioItem = items.find((item) => item.id === audioId);
       if (!audioItem) return;
