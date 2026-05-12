@@ -5012,3 +5012,10 @@
   display: grid;
   gap: .3rem;
 }
+
+
+.audio-mixer-section .control-input,
+.audio-mixer-section .neon-btn {
+  width: 100%;
+  border-radius: 8px;
+}

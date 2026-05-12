@@ -124,6 +124,8 @@
     let compactMultiSelectOutsideClickBound = false;
     let collectionModel = createEmptyCollectionModel();
     let sharedAudioContext = null;
+    let audioMixerPreviewSource = null;
+    let audioMixerPreviewStartedAt = 0;
 
     let marathonPlayer = null;
     let marathonPlayerReady = false;
@@ -8698,6 +8700,29 @@
       });
     }
 
+
+    function stopAudioMixerPreview(completed = false) {
+      if (audioMixerPreviewSource) {
+        try {
+          audioMixerPreviewSource.stop();
+        } catch (err) {
+          // noop
+        }
+        audioMixerPreviewSource.disconnect();
+        audioMixerPreviewSource = null;
+      }
+      const audioContext = getSharedAudioContext();
+      if (!completed && state.audioMixer.isPlaying) {
+        const elapsed = Math.max(0, audioContext.currentTime - audioMixerPreviewStartedAt);
+        state.audioMixer.previewPositionSec = elapsed;
+      } else if (completed) {
+        state.audioMixer.previewPositionSec = 0;
+      }
+      state.audioMixer.isPlaying = false;
+      const feedback = viewAudioMixer.querySelector('[data-audio-mixer-feedback]');
+      if (feedback) feedback.textContent = `Estado: En pausa · Posición: ${Number(state.audioMixer.previewPositionSec || 0).toFixed(1)}s`;
+    }
+
     function renderAudioMixerView() {
       const voces = Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : [];
       const fondos = Array.isArray(state.audioLibrary?.fondos) ? state.audioLibrary.fondos : [];
@@ -8710,7 +8735,7 @@
       viewAudioMixer.innerHTML = `
         <section class="mock-shell">
           <h2>🎚️ Mezclador de audios</h2>
-          <p class="muted">Combina una voz con un fondo y configura volúmenes, espera de voz y estirado.</p>
+          <p class="muted">Combina una voz con un fondo y configura volúmenes y espera de voz.</p>
           <div class="audio-upload-inline">
             <button class="neon-btn toon-btn" data-audio-mixer-preview>▶️ Play</button>
             <button class="neon-btn toon-btn" data-audio-mixer-pause>Pausar</button>
@@ -8748,13 +8773,6 @@
               <button type="button" class="neon-btn" data-audio-mixer-edit-background ${state.audioMixer.backgroundId ? '' : 'disabled'}>✂️ Editar fondo</button>
             <label>Volumen fondo: <span data-audio-mixer-background-volume-value>${Number(state.audioMixer.backgroundVolume || 0).toFixed(2)}</span>
               <input type="range" min="0" max="1.5" step="0.01" class="control-input" data-audio-mixer-background-volume value="${Number(state.audioMixer.backgroundVolume || 0)}">
-            </label>
-            <label>Estirado del fondo
-              <select class="control-input" data-audio-mixer-pad-mode>
-                <option value="none" ${state.audioMixer.backgroundPadMode === 'none' ? 'selected' : ''}>Sin estirar</option>
-                <option value="padStart" ${state.audioMixer.backgroundPadMode === 'padStart' ? 'selected' : ''}>Pad al inicio</option>
-                <option value="padEnd" ${state.audioMixer.backgroundPadMode === 'padEnd' ? 'selected' : ''}>Pad al final</option>
-              </select>
             </label>
             </article>
             <p class="audio-library-feedback" aria-live="polite" data-audio-mixer-feedback>
@@ -8801,21 +8819,47 @@
         if (!state.audioMixer.backgroundId) return;
         openAudioTrimEditorModal('fondos', state.audioMixer.backgroundId);
       });
-      viewAudioMixer.querySelector('[data-audio-mixer-pad-mode]')?.addEventListener('change', (event) => {
-        const validModes = ['none', 'padStart', 'padEnd'];
-        const nextMode = String(event.target?.value || 'none');
-        state.audioMixer.backgroundPadMode = validModes.includes(nextMode) ? nextMode : 'none';
-      });
-      viewAudioMixer.querySelector('[data-audio-mixer-preview]')?.addEventListener('click', () => {
-        state.audioMixer.isPlaying = true;
-        state.audioMixer.previewPositionSec = 0;
+      viewAudioMixer.querySelector('[data-audio-mixer-preview]')?.addEventListener('click', async () => {
         const feedback = viewAudioMixer.querySelector('[data-audio-mixer-feedback]');
-        if (feedback) feedback.textContent = 'Estado: Reproduciendo previsualización · Posición: 0.0s';
+        const voiceItem = voces.find((item) => item.id === state.audioMixer.voiceId);
+        const backgroundItem = fondos.find((item) => item.id === state.audioMixer.backgroundId);
+        if (!voiceItem || !getAudioItemUrl(voiceItem) || !backgroundItem || !getAudioItemUrl(backgroundItem)) {
+          if (feedback) feedback.textContent = 'Selecciona una voz y un fondo válidos para previsualizar.';
+          return;
+        }
+        try {
+          stopAudioMixerPreview();
+          const [voiceBuffer, backgroundBuffer] = await Promise.all([
+            decodeAudioBufferFromUrl(getAudioItemUrl(voiceItem)),
+            decodeAudioBufferFromUrl(getAudioItemUrl(backgroundItem))
+          ]);
+          const mixedBuffer = await createMixedAudioBuffer({
+            voiceBuffer,
+            backgroundBuffer,
+            voiceVolume: state.audioMixer.voiceVolume,
+            backgroundVolume: state.audioMixer.backgroundVolume,
+            voiceDelaySec: state.audioMixer.voiceDelaySec,
+            backgroundPadMode: 'none'
+          });
+          const audioContext = getSharedAudioContext();
+          if (audioContext.state === 'suspended') await audioContext.resume();
+          const source = audioContext.createBufferSource();
+          source.buffer = mixedBuffer;
+          source.connect(audioContext.destination);
+          audioMixerPreviewSource = source;
+          audioMixerPreviewStartedAt = audioContext.currentTime;
+          state.audioMixer.previewPositionSec = 0;
+          state.audioMixer.isPlaying = true;
+          if (feedback) feedback.textContent = 'Estado: Reproduciendo previsualización · Posición: 0.0s';
+          source.onended = () => stopAudioMixerPreview(true);
+          source.start();
+        } catch (err) {
+          stopAudioMixerPreview();
+          if (feedback) feedback.textContent = normalizeAudioUploadError(err);
+        }
       });
       viewAudioMixer.querySelector('[data-audio-mixer-pause]')?.addEventListener('click', () => {
-        state.audioMixer.isPlaying = false;
-        const feedback = viewAudioMixer.querySelector('[data-audio-mixer-feedback]');
-        if (feedback) feedback.textContent = `Estado: En pausa · Posición: ${Number(state.audioMixer.previewPositionSec || 0).toFixed(1)}s`;
+        stopAudioMixerPreview();
       });
       viewAudioMixer.querySelector('[data-audio-mixer-save]')?.addEventListener('click', async (event) => {
         state.audioMixer.isPlaying = false;
@@ -8845,7 +8889,7 @@
             voiceVolume: state.audioMixer.voiceVolume,
             backgroundVolume: state.audioMixer.backgroundVolume,
             voiceDelaySec: state.audioMixer.voiceDelaySec,
-            backgroundPadMode: state.audioMixer.backgroundPadMode
+            backgroundPadMode: 'none'
           });
           const blob = audioBufferToWavBlob(mixedBuffer);
           if (feedback) feedback.textContent = 'Subiendo mezcla a Firebase Storage...';
