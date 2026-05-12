@@ -6869,6 +6869,7 @@
         const focusedCharacterModel = (collectionModel.characters || [])
           .find((character) => normalizeName(character?.name || '') === normalizeName(focusedCharacter));
         const focusedAssignedMix = getAssignedMixForCharacterId(focusedCharacterModel?.id || '');
+        const focusedCharacterMedia = getCharacterMedia(focusedCharacterModel?.id || focusedCharacterId || focusedCharacter);
 
         const profileAvatarMarkup = isCharacterLocked
           ? `
@@ -6985,6 +6986,23 @@
                 <button type="button" class="neon-btn toon-btn" data-assign-character-audio>Designar audio</button>
                 <button type="button" class="neon-btn toon-btn" data-download-character-multimedia ${focusedAssignedMix ? '' : 'disabled'}>Descargar multimedia</button>
               </div>
+              <form id="characterImageUrlInlineForm" class="character-image-url-form" hidden>
+                <label>URL de imagen
+                  <input id="characterImageUrlInlineInput" type="url" class="control-input" placeholder="https://..." autocomplete="off">
+                </label>
+                <button type="submit" class="neon-btn neon-btn--primary">Guardar</button>
+              </form>
+              <section class="character-media-preview-grid">
+                ${focusedCharacterMedia.imageUrls.map((url, index) => `
+                  <article class="character-media-preview-card">
+                    <img src="${escapeHtml(url)}" alt="Imagen multimedia ${index + 1} de ${escapeHtml(focusedCharacter)}" loading="lazy">
+                    <div class="actions">
+                      <a href="${escapeHtml(url)}" class="neon-btn" target="_blank" rel="noopener">Abrir</a>
+                      <button type="button" class="neon-btn toon-btn toon-btn--danger" data-delete-indice-character-image="${index}">Eliminar</button>
+                    </div>
+                  </article>
+                `).join('') || '<p class="muted">Sin imágenes guardadas.</p>'}
+              </section>
             </article>
 
             <article class="profile-section">
