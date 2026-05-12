@@ -2324,6 +2324,11 @@
           itemsToDownload.push({ url: backgroundUrl, filename: `${cssSafe(character.name || 'personaje')}-fondo.${getUrlExtension(backgroundUrl, 'wav')}` });
         }
       }
+      const assignedMix = getAssignedMixForCharacterId(character.id);
+      const assignedMixUrl = getAudioItemUrl(assignedMix);
+      if (assignedMixUrl) {
+        itemsToDownload.push({ url: assignedMixUrl, filename: `${cssSafe(character.name || 'personaje')}-mezcla.${getUrlExtension(assignedMixUrl, 'wav')}` });
+      }
       (Array.isArray(media.imageUrls) ? media.imageUrls : []).forEach((imageUrl, index) => {
         if (!String(imageUrl || '').trim()) return;
         itemsToDownload.push({ url: imageUrl, filename: `${cssSafe(character.name || 'personaje')}-imagen-${index + 1}.${getUrlExtension(imageUrl, 'jpg')}` });
@@ -7047,6 +7052,16 @@
                     `).join('')}
                   </select>
                 </label>
+                <label>Mezcla guardada del personaje
+                  <select id="characterMixInlineSelect" class="control-input">
+                    <option value="">Sin mezcla asignada</option>
+                    ${getAssignableMixesForCharacter(focusedCharacterModel?.id || '').map((mix) => {
+                      const mixId = String(mix?.id || '').trim();
+                      const selected = mixId && mixId === String(focusedCharacterModel?.assignedMixAudioId || '').trim();
+                      return `<option value="${escapeHtml(mixId)}" ${selected ? 'selected' : ''}>${escapeHtml(mix?.name || 'Mezcla sin nombre')}</option>`;
+                    }).join('')}
+                  </select>
+                </label>
               </div>
               <div class="profile-edit-block">
                 <h5>Imágenes</h5>
@@ -7127,6 +7142,28 @@
           if (feedback) {
             feedback.style.color = '#9ff7c8';
             feedback.textContent = nextBackgroundId ? 'Fondo asignado correctamente.' : 'Fondo removido.';
+          }
+        });
+        document.getElementById('characterMixInlineSelect')?.addEventListener('change', (event) => {
+          const nextMixId = String(event.target?.value || '').trim();
+          const characterId = String(focusedCharacterModel?.id || '').trim();
+          const assignableMixes = getAssignableMixesForCharacter(characterId);
+          const feedback = document.getElementById('indiceCharacterFeedback');
+          if (nextMixId && !assignableMixes.some((mix) => String(mix?.id || '').trim() === nextMixId)) {
+            if (feedback) {
+              feedback.style.color = '#ffb6b6';
+              feedback.textContent = 'Esa mezcla ya está asignada a otro personaje.';
+            }
+            event.target.value = String(focusedCharacterModel?.assignedMixAudioId || '');
+            return;
+          }
+          if (focusedCharacterModel) {
+            focusedCharacterModel.assignedMixAudioId = nextMixId;
+            saveCollectionModel();
+          }
+          if (feedback) {
+            feedback.style.color = '#9ff7c8';
+            feedback.textContent = nextMixId ? 'Mezcla asignada correctamente.' : 'Mezcla removida.';
           }
         });
         document.getElementById('characterVoiceInlineSelect')?.addEventListener('change', (event) => {
