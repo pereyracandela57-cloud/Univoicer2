@@ -6835,15 +6835,6 @@
         )) || 'A';
         const focusedCharacterId = getCharacterIdByName(focusedCharacter);
         const availableBackgrounds = getAvailableBackgroundsForCharacter(focusedCharacterId);
-        const currentBackgroundId = getCharacterBackgroundId(focusedCharacter);
-        const selectedBackgroundId = availableBackgrounds.some((item) => String(item.id || '') === currentBackgroundId) ? currentBackgroundId : '';
-        const hasCharacterUniverses = universos.length > 0;
-        const backgroundSelectDisabled = !hasCharacterUniverses || !availableBackgrounds.length;
-        const backgroundHelpText = !hasCharacterUniverses
-          ? 'El selector está deshabilitado porque este personaje no tiene universos asociados.'
-          : !availableBackgrounds.length
-            ? 'No hay fondos asociados a los universos de este personaje.'
-            : 'Solo se listan fondos que comparten al menos un universo con este personaje.';
 
         const isCharacterLocked = realVideos.length === 0;
         const customLockedAvatarUrl = getCharacterLockedAvatarUrl(focusedCharacter);
@@ -6942,13 +6933,6 @@
                 <label>Avatar bloqueado (URL opcional)
                   <input type="text" name="lockedAvatarUrl" value="${customLockedAvatarUrl}" placeholder="https://...">
                 </label>
-                <label>Fondo
-                  <select name="backgroundId" ${backgroundSelectDisabled ? 'disabled' : ''}>
-                    <option value="">${backgroundSelectDisabled ? 'Sin fondos disponibles' : 'Sin fondo asignado'}</option>
-                    ${availableBackgrounds.map((background) => `<option value="${escapeHtml(background.id)}" ${String(background.id || '') === selectedBackgroundId ? 'selected' : ''}>${escapeHtml(background.name || 'Fondo sin nombre')}</option>`).join('')}
-                  </select>
-                  <span class="muted">${escapeHtml(backgroundHelpText)}</span>
-                </label>
                 <label>Rol
                   <select name="role" required>
                     ${['Protagonista', 'Villano', 'Secundario', 'Recurrente']
@@ -6966,7 +6950,6 @@
               </div>
               <div class="character-inline-editor__actions">
                 <button type="submit" class="neon-btn neon-btn--primary">Guardar cambios</button>
-                <button type="button" id="downloadCharacterMultimediaBtn" class="neon-btn">Descargar multimedia</button>
                 <button type="button" id="cancelCharacterEdit" class="neon-btn">Cancelar</button>
               </div>
               <p class="muted">Selecciona un actor o universo y el selector se cerrará automáticamente. Haz clic en una etiqueta para quitarla.</p>
@@ -7094,7 +7077,8 @@
           const selectedActors = formData.getAll('characterActors').map((value) => String(value || '').trim()).filter(Boolean);
           const selectedUniverses = formData.getAll('characterUniverses').map((value) => String(value || '').trim()).filter(Boolean);
           const lockedAvatarUrl = String(formData.get('lockedAvatarUrl') || '').trim();
-          const selectedBackgroundId = String(formData.get('backgroundId') || '').trim();
+          const hasBackgroundField = formData.has('backgroundId');
+          const selectedBackgroundId = hasBackgroundField ? String(formData.get('backgroundId') || '').trim() : null;
           const nextRole = String(formData.get('role') || '').trim() || 'Recurrente';
           const nextRoleCategory = String(formData.get('roleCategory') || '').trim().toUpperCase() || 'A';
           if (!newName) return;
@@ -7102,7 +7086,7 @@
           const newActorsList = [...new Set(selectedActors)];
           const parsedUniverses = [...new Set(selectedUniverses)];
           const validBackgroundsForSelection = getAvailableBackgroundsForCharacter(getCharacterIdByName(focusedCharacter), { universeOverride: parsedUniverses });
-          if (selectedBackgroundId && !validBackgroundsForSelection.some((background) => String(background.id || '') === selectedBackgroundId)) {
+          if (hasBackgroundField && selectedBackgroundId && !validBackgroundsForSelection.some((background) => String(background.id || '') === selectedBackgroundId)) {
             const feedback = document.getElementById('indiceCharacterFeedback');
             if (feedback) {
               feedback.textContent = 'El fondo seleccionado no comparte universo con el personaje.';
@@ -7161,13 +7145,13 @@
                   categoriaRol: cleanRoleCategory,
                   thumbnail: createPlaceholderCover(cleanName),
                   locked_avatar_url: lockedAvatarUrl,
-                  ...(selectedBackgroundId ? { backgroundId: selectedBackgroundId } : {})
+                  ...(hasBackgroundField && selectedBackgroundId ? { backgroundId: selectedBackgroundId } : {})
               });
               blockCharacterForActor(actor, cleanName);
           });
 
           setCharacterLockedAvatarUrl(cleanName, lockedAvatarUrl);
-          setCharacterBackgroundId(cleanName, selectedBackgroundId);
+          if (hasBackgroundField) setCharacterBackgroundId(cleanName, selectedBackgroundId);
           state.showCharacterInlineEdit = false;
           state.indiceCharacterFocus = cleanName;
           saveBlockedCharacters();
