@@ -158,6 +158,7 @@
     const viewAudioGallery = document.getElementById('viewAudioGallery');
     const viewAudioVoces = document.getElementById('viewAudioVoces');
     const viewAudioFondos = document.getElementById('viewAudioFondos');
+    const viewAudioMezclas = document.getElementById('viewAudioMezclas');
     const viewAudioMixer = document.getElementById('viewAudioMixer');
 
     function normalizeRoleTier(value) {
@@ -8607,15 +8608,13 @@
 
     function renderAudioGalleryView() {
       viewAudioGallery.innerHTML = `
-        <section class="mock-shell">
+        <section class="mock-shell audio-gallery-shell">
           <h2>Galería de audios</h2>
-          <div class="mock-row">
-            <button class="neon-btn toon-btn" data-audio-folder="voces" style="min-height: 140px; min-width: 220px;">🎤 VOCES</button>
-            <button class="neon-btn toon-btn" data-audio-folder="fondos" style="min-height: 140px; min-width: 220px;">🎵 FONDOS</button>
-            <button class="neon-btn toon-btn" data-audio-folder="mixer" style="min-height: 140px; min-width: 220px;">🎚️ MEZCLAR</button>
-          </div>
-          <div class="actions" style="margin-top: 1rem;">
-            <button class="neon-btn toon-btn" data-open-audio-mixer>🎛️ Preview mezcla (voz + fondo)</button>
+          <div class="audio-gallery-grid">
+            <button class="neon-btn toon-btn audio-gallery-btn" data-audio-folder="voces">🎤 VOCES</button>
+            <button class="neon-btn toon-btn audio-gallery-btn" data-audio-folder="fondos">🎵 FONDOS</button>
+            <button class="neon-btn toon-btn audio-gallery-btn" data-audio-folder="mixer">🎚️ MEZCLAR</button>
+            <button class="neon-btn toon-btn audio-gallery-btn" data-audio-folder="mezclas">🧪 AUDIOS MEZCLAS</button>
           </div>
         </section>
       `;
@@ -8623,26 +8622,28 @@
       viewAudioGallery.querySelector('[data-audio-folder="voces"]')?.addEventListener('click', () => changeView('audioVoces'));
       viewAudioGallery.querySelector('[data-audio-folder="fondos"]')?.addEventListener('click', () => changeView('audioFondos'));
       viewAudioGallery.querySelector('[data-audio-folder="mixer"]')?.addEventListener('click', () => changeView('audioMixer'));
+      viewAudioGallery.querySelector('[data-audio-folder="mezclas"]')?.addEventListener('click', () => changeView('audioMezclas'));
     }
 
     function renderAudioCategoryView(category) {
       const isVoces = category === 'voces';
-      const title = isVoces ? 'VOCES' : 'FONDOS';
-      const addLabel = isVoces ? 'Agregar voces' : 'Agregar fondos';
-      const targetView = isVoces ? viewAudioVoces : viewAudioFondos;
+      const isMezclas = category === 'mezclas';
+      const title = isVoces ? 'VOCES' : isMezclas ? 'AUDIOS MEZCLAS' : 'FONDOS';
+      const addLabel = isVoces ? 'Agregar voces' : isMezclas ? 'Agregar mezcla' : 'Agregar fondos';
+      const targetView = isVoces ? viewAudioVoces : isMezclas ? viewAudioMezclas : viewAudioFondos;
       const items = Array.isArray(state.audioLibrary?.[category]) ? state.audioLibrary[category] : [];
       const status = state.uploadStatusByCategory?.[category] || { loading: false, error: '', success: '' };
-      const itemCategoryClass = isVoces ? 'audio-library-item--voice' : 'audio-library-item--background';
+      const itemCategoryClass = isVoces ? 'audio-library-item--voice' : isMezclas ? 'audio-library-item--mix' : 'audio-library-item--background';
 
       targetView.innerHTML = `
         <section class="mock-shell">
           <h2>${title}</h2>
-          <p class="muted">Gestiona y reproduce tus audios cargados en la categoría ${title.toLowerCase()}.</p>
-          <div class="audio-upload-inline">
+          <p class="muted">${isMezclas ? 'Aquí verás las mezclas guardadas desde el sector de mezclar.' : `Gestiona y reproduce tus audios cargados en la categoría ${title.toLowerCase()}.`}</p>
+          ${isMezclas ? '' : `<div class="audio-upload-inline">
             <input type="text" class="control-input" data-audio-name-input="${category}" placeholder="Nombre para mostrar (opcional)">
             <button class="neon-btn toon-btn" data-audio-add-btn="${category}" ${status.loading ? 'disabled' : ''}>${status.loading ? 'Subiendo...' : addLabel}</button>
             <input type="file" accept="audio/*" multiple data-audio-file-input="${category}" hidden>
-          </div>
+          </div>`}
           <p class="audio-library-feedback ${status.error ? 'is-error' : status.success ? 'is-success' : ''}" aria-live="polite">${escapeHtml(status.error || status.success || '')}</p>
           <button class="neon-btn toon-btn" data-back-audio-gallery>← Volver a Galería de audios</button>
         </section>
@@ -8669,10 +8670,10 @@
         </section>
       `;
       targetView.querySelector('[data-back-audio-gallery]')?.addEventListener('click', () => changeView('audioGallery'));
-      targetView.querySelector('[data-audio-add-btn]')?.addEventListener('click', () => {
+      if (!isMezclas) targetView.querySelector('[data-audio-add-btn]')?.addEventListener('click', () => {
         targetView.querySelector('[data-audio-file-input]')?.click();
       });
-      targetView.querySelector('[data-audio-file-input]')?.addEventListener('change', (event) => {
+      if (!isMezclas) targetView.querySelector('[data-audio-file-input]')?.addEventListener('change', (event) => {
         const nameInput = targetView.querySelector('[data-audio-name-input]');
         const customName = String(nameInput?.value || '').trim();
         if (nameInput) nameInput.value = '';
@@ -9174,6 +9175,7 @@
       viewAudioGallery.classList.toggle('active', next === 'audioGallery');
       viewAudioVoces.classList.toggle('active', next === 'audioVoces');
       viewAudioFondos.classList.toggle('active', next === 'audioFondos');
+      viewAudioMezclas.classList.toggle('active', next === 'audioMezclas');
       viewAudioMixer.classList.toggle('active', next === 'audioMixer');
       document.querySelectorAll('.sidebar-nav .sidebar-item').forEach(btn => btn.classList.remove('active'));
       const activeNavByView = {
@@ -9186,6 +9188,7 @@
         audioGallery: navGaleriaAudios,
         audioVoces: navGaleriaAudios,
         audioFondos: navGaleriaAudios,
+        audioMezclas: navGaleriaAudios,
         audioMixer: navGaleriaAudios
       };
       activeNavByView[next]?.classList.add('active');
@@ -9208,6 +9211,7 @@
       if (next === 'audioGallery') renderAudioGalleryView();
       if (next === 'audioVoces') renderAudioCategoryView('voces');
       if (next === 'audioFondos') renderAudioCategoryView('fondos');
+      if (next === 'audioMezclas') renderAudioCategoryView('mezclas');
       if (next === 'audioMixer') renderAudioMixerView();
     }
 
