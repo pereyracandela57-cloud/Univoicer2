@@ -2277,6 +2277,17 @@
       return mixes.filter((mix) => !takenByOtherCharacters.has(String(mix?.id || '').trim()));
     }
 
+    function getAssignableVoicesForCharacter(characterId) {
+      const targetCharacterId = String(characterId || '').trim();
+      const voices = Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : [];
+      return voices.filter((voice) => {
+        const ownerId = String(voice?.characterId || '').trim();
+        const voiceId = String(voice?.id || '').trim();
+        if (!voiceId) return false;
+        return !ownerId || ownerId === targetCharacterId;
+      });
+    }
+
     async function downloadUrlAsFile(url, fileName) {
       const cleanUrl = String(url || '').trim();
       if (!cleanUrl) throw new Error('No hay URL descargable para este audio.');
@@ -2313,21 +2324,22 @@
       const availableBackgrounds = getAvailableBackgroundsForCharacter(character.id);
       const selectedBackground = availableBackgrounds.find((background) => background.id === media.backgroundId) || null;
       const itemsToDownload = [];
-      characterVoices.forEach((voice, index) => {
-        const url = getAudioItemUrl(voice);
-        if (!url) return;
-        itemsToDownload.push({ url, filename: `${cssSafe(character.name || 'personaje')}-voz-${index + 1}.${getUrlExtension(url, 'wav')}` });
-      });
-      if (selectedBackground) {
-        const backgroundUrl = getAudioItemUrl(selectedBackground);
-        if (backgroundUrl) {
-          itemsToDownload.push({ url: backgroundUrl, filename: `${cssSafe(character.name || 'personaje')}-fondo.${getUrlExtension(backgroundUrl, 'wav')}` });
-        }
-      }
       const assignedMix = getAssignedMixForCharacterId(character.id);
       const assignedMixUrl = getAudioItemUrl(assignedMix);
       if (assignedMixUrl) {
         itemsToDownload.push({ url: assignedMixUrl, filename: `${cssSafe(character.name || 'personaje')}-mezcla.${getUrlExtension(assignedMixUrl, 'wav')}` });
+      } else {
+        characterVoices.forEach((voice, index) => {
+          const url = getAudioItemUrl(voice);
+          if (!url) return;
+          itemsToDownload.push({ url, filename: `${cssSafe(character.name || 'personaje')}-voz-${index + 1}.${getUrlExtension(url, 'wav')}` });
+        });
+        if (selectedBackground) {
+          const backgroundUrl = getAudioItemUrl(selectedBackground);
+          if (backgroundUrl) {
+            itemsToDownload.push({ url: backgroundUrl, filename: `${cssSafe(character.name || 'personaje')}-fondo.${getUrlExtension(backgroundUrl, 'wav')}` });
+          }
+        }
       }
       (Array.isArray(media.imageUrls) ? media.imageUrls : []).forEach((imageUrl, index) => {
         if (!String(imageUrl || '').trim()) return;
@@ -5658,15 +5670,8 @@
     }
 
     function getAvailableBackgroundsForCharacter(characterId, { universeOverride = null } = {}) {
-      const characterUniverses = getCharacterUniverseReferences(characterId, universeOverride);
-      if (!characterUniverses.ids.size && !characterUniverses.names.size) return [];
       const fondos = Array.isArray(state.audioLibrary?.fondos) ? state.audioLibrary.fondos : [];
-      return fondos.filter((background) => {
-        const backgroundUniverses = getBackgroundUniverseReferences(background);
-        const sharesId = [...backgroundUniverses.ids].some((universeId) => characterUniverses.ids.has(universeId));
-        const sharesName = [...backgroundUniverses.names].some((universeName) => characterUniverses.names.has(universeName));
-        return sharesId || sharesName;
-      });
+      return fondos;
     }
 
     function getCharacterBackgroundId(characterName) {
@@ -7033,25 +7038,6 @@
               </div>
               <div class="profile-edit-block">
                 <h5>Audios</h5>
-                <label>Voz
-                  <select id="characterVoiceInlineSelect" class="control-input">
-                    <option value="">Sin voz asignada</option>
-                    ${(Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).map((voice) => {
-                      const voiceId = String(voice?.id || '').trim();
-                      const selected = voiceId && voiceId === focusedCharacterMedia.voiceId;
-                      return `<option value="${escapeHtml(voiceId)}" ${selected ? 'selected' : ''}>${escapeHtml(voice?.name || 'Voz sin nombre')}</option>`;
-                    }).join('')}
-                  </select>
-                </label>
-                ${(Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).length ? '' : '<p class="muted">No hay voces en la galería.</p>'}
-                <label>Fondo del personaje (solo de sus universos)
-                  <select id="characterBackgroundInlineSelect" class="control-input">
-                    <option value="">Sin fondo asignado</option>
-                    ${getAvailableBackgroundsForCharacter(focusedCharacterModel?.id || '').map((background) => `
-                      <option value="${escapeHtml(background.id)}" ${background.id === focusedCharacterMedia.backgroundId ? 'selected' : ''}>${escapeHtml(background.name || 'Fondo sin nombre')}</option>
-                    `).join('')}
-                  </select>
-                </label>
                 <label>Mezcla guardada del personaje
                   <select id="characterMixInlineSelect" class="control-input">
                     <option value="">Sin mezcla asignada</option>
@@ -7062,6 +7048,27 @@
                     }).join('')}
                   </select>
                 </label>
+                ${focusedAssignedMix ? '<p class="muted">Con mezcla asignada, solo se mostrará y descargará la mezcla (más imágenes).</p>' : `
+                  <label>Voz
+                    <select id="characterVoiceInlineSelect" class="control-input">
+                      <option value="">Sin voz asignada</option>
+                      ${getAssignableVoicesForCharacter(focusedCharacterModel?.id || '').map((voice) => {
+                        const voiceId = String(voice?.id || '').trim();
+                        const selected = voiceId && voiceId === focusedCharacterMedia.voiceId;
+                        return `<option value="${escapeHtml(voiceId)}" ${selected ? 'selected' : ''}>${escapeHtml(voice?.name || 'Voz sin nombre')}</option>`;
+                      }).join('')}
+                    </select>
+                  </label>
+                  ${getAssignableVoicesForCharacter(focusedCharacterModel?.id || '').length ? '' : '<p class="muted">No hay voces disponibles en la galería.</p>'}
+                  <label>Fondo del personaje
+                    <select id="characterBackgroundInlineSelect" class="control-input">
+                      <option value="">Sin fondo asignado</option>
+                      ${getAvailableBackgroundsForCharacter(focusedCharacterModel?.id || '').map((background) => `
+                        <option value="${escapeHtml(background.id)}" ${background.id === focusedCharacterMedia.backgroundId ? 'selected' : ''}>${escapeHtml(background.name || 'Fondo sin nombre')}</option>
+                      `).join('')}
+                    </select>
+                  </label>
+                `}
               </div>
               <div class="profile-edit-block">
                 <h5>Imágenes</h5>
@@ -7147,7 +7154,7 @@
         document.getElementById('characterMixInlineSelect')?.addEventListener('change', (event) => {
           const nextMixId = String(event.target?.value || '').trim();
           const characterId = String(focusedCharacterModel?.id || '').trim();
-          const assignableMixes = getAssignableMixesForCharacter(characterId);
+            const assignableMixes = getAssignableMixesForCharacter(characterId);
           const feedback = document.getElementById('indiceCharacterFeedback');
           if (nextMixId && !assignableMixes.some((mix) => String(mix?.id || '').trim() === nextMixId)) {
             if (feedback) {
@@ -7169,6 +7176,16 @@
         document.getElementById('characterVoiceInlineSelect')?.addEventListener('change', (event) => {
           const selectedVoiceId = String(event.target?.value || '').trim();
           const characterId = String(focusedCharacterModel?.id || '').trim();
+          const assignableVoices = getAssignableVoicesForCharacter(characterId);
+          const feedback = document.getElementById('indiceCharacterFeedback');
+          if (selectedVoiceId && !assignableVoices.some((voice) => String(voice?.id || '').trim() === selectedVoiceId)) {
+            if (feedback) {
+              feedback.style.color = '#ffb6b6';
+              feedback.textContent = 'Esa voz ya está asignada a otro personaje.';
+            }
+            event.target.value = String(focusedCharacterMedia.voiceId || '');
+            return;
+          }
           state.audioLibrary.voces = (Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).map((voice) => {
             const voiceId = String(voice?.id || '').trim();
             if (audioItemMatchesCharacter(voice, characterId) && voiceId !== selectedVoiceId) {
@@ -7181,7 +7198,6 @@
           });
           saveAudioLibrary();
           saveCharacterMedia(characterId, { voiceId: selectedVoiceId });
-          const feedback = document.getElementById('indiceCharacterFeedback');
           if (feedback) {
             feedback.style.color = '#9ff7c8';
             feedback.textContent = selectedVoiceId ? 'Voz asignada correctamente.' : 'Voz removida.';
@@ -7230,23 +7246,12 @@
           const selectedActors = formData.getAll('characterActors').map((value) => String(value || '').trim()).filter(Boolean);
           const selectedUniverses = formData.getAll('characterUniverses').map((value) => String(value || '').trim()).filter(Boolean);
           const lockedAvatarUrl = String(formData.get('lockedAvatarUrl') || '').trim();
-          const hasBackgroundField = formData.has('backgroundId');
-          const selectedBackgroundId = hasBackgroundField ? String(formData.get('backgroundId') || '').trim() : null;
           const nextRole = String(formData.get('role') || '').trim() || 'Recurrente';
           const nextRoleCategory = String(formData.get('roleCategory') || '').trim().toUpperCase() || 'A';
           if (!newName) return;
 
           const newActorsList = [...new Set(selectedActors)];
           const parsedUniverses = [...new Set(selectedUniverses)];
-          const validBackgroundsForSelection = getAvailableBackgroundsForCharacter(getCharacterIdByName(focusedCharacter), { universeOverride: parsedUniverses });
-          if (hasBackgroundField && selectedBackgroundId && !validBackgroundsForSelection.some((background) => String(background.id || '') === selectedBackgroundId)) {
-            const feedback = document.getElementById('indiceCharacterFeedback');
-            if (feedback) {
-              feedback.textContent = 'El fondo seleccionado no comparte universo con el personaje.';
-              feedback.style.color = '#ffb6b6';
-            }
-            return;
-          }
           const {
             canonicalName: cleanName,
             canonicalRole: cleanRole,
@@ -7297,14 +7302,12 @@
                   rol: cleanRole,
                   categoriaRol: cleanRoleCategory,
                   thumbnail: createPlaceholderCover(cleanName),
-                  locked_avatar_url: lockedAvatarUrl,
-                  ...(hasBackgroundField && selectedBackgroundId ? { backgroundId: selectedBackgroundId } : {})
+                  locked_avatar_url: lockedAvatarUrl
               });
               blockCharacterForActor(actor, cleanName);
           });
 
           setCharacterLockedAvatarUrl(cleanName, lockedAvatarUrl);
-          if (hasBackgroundField) setCharacterBackgroundId(cleanName, selectedBackgroundId);
           state.showCharacterInlineEdit = false;
           state.indiceCharacterFocus = cleanName;
           saveBlockedCharacters();
