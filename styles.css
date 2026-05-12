@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800&family=Exo+2:wght@400;600;700&display=swap");
+
     :root {
       color-scheme: dark;
       --bg: #050b17;
@@ -44,7 +46,7 @@
     html, body { margin: 0; min-height: 100%; height: 100%; overflow: hidden; }
 
     body {
-      font-family: "Comic Sans MS", "Chalkboard SE", "Marker Felt", "Trebuchet MS", cursive, sans-serif;
+      font-family: "Exo 2", "Trebuchet MS", sans-serif;
       font-size: 15px;
       letter-spacing: .01em;
       background:
@@ -4773,15 +4775,30 @@
   --audio-item-accent-mid: rgba(43, 247, 255, .34);
   --audio-item-bg: rgba(7, 12, 26, 0.42);
   display: grid;
-  gap: .5rem;
-  padding: .85rem;
+  gap: .75rem;
+  padding: 1rem;
   border: 1px solid var(--audio-item-accent-mid);
-  border-radius: .95rem;
+  border-radius: .75rem;
+  min-height: 260px;
+  aspect-ratio: 1 / 1;
+  position: relative;
+  overflow: hidden;
   background:
+    repeating-linear-gradient(120deg, rgba(255,255,255,.05) 0 2px, rgba(0,0,0,0) 2px 7px),
     linear-gradient(145deg, var(--audio-item-accent-soft), rgba(7, 12, 26, .58) 46%, var(--audio-item-bg)),
     rgba(7, 12, 26, 0.42);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08), 0 10px 24px rgba(2, 8, 20, .24);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .2), inset 0 -10px 16px rgba(0, 0, 0, .35), 0 10px 24px rgba(2, 8, 20, .34);
   transition: transform .22s ease, border-color .22s ease, box-shadow .22s ease, background .22s ease;
+}
+
+.audio-library-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(165deg, rgba(255,255,255,.28), rgba(255,255,255,0) 40%);
+  mix-blend-mode: screen;
+  opacity: .45;
 }
 
 .audio-library-item--voice {
@@ -4815,7 +4832,10 @@
 
 .audio-library-item-name {
   margin: 0;
-  font-weight: 700;
+  font-weight: 800;
+  font-family: "Orbitron", "Exo 2", sans-serif;
+  letter-spacing: .05em;
+  text-shadow: 0 0 10px color-mix(in srgb, var(--audio-item-accent) 45%, transparent);
 }
 
 .audio-library-item-meta {
@@ -4826,12 +4846,18 @@
 
 .audio-library-item audio {
   width: 100%;
+  min-height: 78px;
+  border-radius: .65rem;
+  border: 1px solid color-mix(in srgb, var(--audio-item-accent) 50%, #fff);
+  background: linear-gradient(180deg, rgba(13, 24, 45, .95), rgba(5, 11, 24, .96));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.06), 0 0 16px color-mix(in srgb, var(--audio-item-accent) 20%, transparent);
 }
 
 .audio-library-item-actions {
   display: flex;
   gap: .55rem;
   flex-wrap: wrap;
+  margin-top: auto;
 }
 
 .audio-library-item-actions .audio-used-btn {
