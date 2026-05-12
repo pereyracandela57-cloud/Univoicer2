@@ -3523,8 +3523,8 @@
       const MAX_MAP_ZOOM = 2.0;
       const WHEEL_ZOOM_FACTOR = 1.1;
       const DRAG_OPEN_THRESHOLD = 8;
-      const DROP_TARGET_EDGE_SNAP_DISTANCE = 44;
-      const DROP_TARGET_CENTER_SNAP_DISTANCE = 86;
+      const DROP_TARGET_EDGE_SNAP_DISTANCE = 32;
+      const DROP_TARGET_CENTER_SNAP_DISTANCE = 72;
 
       const syncMapZoomDisplay = (scaleValue) => {
         const percentage = `${Math.round(scaleValue * 100)}%`;
@@ -4209,7 +4209,9 @@
           if (!mapViewRuntime.dragState.activeNodeId) return;
           const nodeEl = mapViewRuntime.dragState.activeNodeElement;
           const activeNodeId = mapViewRuntime.dragState.activeNodeId;
-          const targetNodeId = mapViewRuntime.dragState.targetNodeId;
+          const activeNode = state.universeNodes.find(item => item.id === activeNodeId);
+          const targetNodeAtDrop = findDropTargetForNode(activeNode);
+          const targetNodeId = targetNodeAtDrop?.id || '';
           if (nodeEl?.hasPointerCapture(event.pointerId)) {
             nodeEl.releasePointerCapture(event.pointerId);
           }
@@ -4222,7 +4224,6 @@
             if (wouldCreateUniverseCycle(activeNodeId, targetNodeId)) {
               alert('No se puede crear una relación cíclica entre universos.');
             } else {
-              const activeNode = state.universeNodes.find(item => item.id === activeNodeId);
               const targetNode = state.universeNodes.find(item => item.id === targetNodeId);
               if (activeNode && nodeHasChildren(activeNodeId)) {
                 alert('No se puede convertir en mundo un universo que ya tiene hijos.');
