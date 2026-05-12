@@ -2303,14 +2303,32 @@
     async function downloadCharacterMultimedia(characterId) {
       const character = getCharacterById(characterId);
       if (!character) throw new Error('No encontramos el personaje seleccionado.');
-      const assignedMix = getAssignedMixForCharacterId(character.id);
-      if (assignedMix) {
-        const url = getAudioItemUrl(assignedMix);
-        if (!url) throw new Error('La mezcla asignada no tiene URL descargable.');
-        await downloadUrlAsFile(url, `${cssSafe(character.name || 'personaje')}-mezcla.wav`);
-        return `Descargando mezcla asignada: ${assignedMix.name || 'Mezcla'}.`;
+      const media = getCharacterMedia(character.id);
+      const characterVoices = (Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : [])
+        .filter((voice) => audioItemMatchesCharacter(voice, character.id));
+      const availableBackgrounds = getAvailableBackgroundsForCharacter(character.id);
+      const selectedBackground = availableBackgrounds.find((background) => background.id === media.backgroundId) || null;
+      const itemsToDownload = [];
+      characterVoices.forEach((voice, index) => {
+        const url = getAudioItemUrl(voice);
+        if (!url) return;
+        itemsToDownload.push({ url, filename: `${cssSafe(character.name || 'personaje')}-voz-${index + 1}.${getUrlExtension(url, 'wav')}` });
+      });
+      if (selectedBackground) {
+        const backgroundUrl = getAudioItemUrl(selectedBackground);
+        if (backgroundUrl) {
+          itemsToDownload.push({ url: backgroundUrl, filename: `${cssSafe(character.name || 'personaje')}-fondo.${getUrlExtension(backgroundUrl, 'wav')}` });
+        }
       }
-      throw new Error('Este personaje todavía no tiene una mezcla asignada para descargar.');
+      (Array.isArray(media.imageUrls) ? media.imageUrls : []).forEach((imageUrl, index) => {
+        if (!String(imageUrl || '').trim()) return;
+        itemsToDownload.push({ url: imageUrl, filename: `${cssSafe(character.name || 'personaje')}-imagen-${index + 1}.${getUrlExtension(imageUrl, 'jpg')}` });
+      });
+      if (!itemsToDownload.length) throw new Error('No hay multimedia asignada para descargar.');
+      for (const item of itemsToDownload) {
+        await downloadUrlAsFile(item.url, item.filename);
+      }
+      return `Descargando ${itemsToDownload.length} archivos multimedia.`;
     }
 
     function openAssignCharacterMixModal(characterId, { onAssigned } = {}) {
@@ -6963,18 +6981,38 @@
             </section>
 
             <article class="profile-section">
-              <h4 class="profile-section__title">📦 Multimedia del personaje</h4>
-              <p class="muted">${focusedAssignedMix ? `Mezcla asignada: ${escapeHtml(focusedAssignedMix.name || 'Mezcla sin nombre')}.` : 'Sin mezcla asignada.'}</p>
-              <div class="actions">
-                <button type="button" class="neon-btn toon-btn" data-assign-character-audio>Designar audio</button>
-                <button type="button" class="neon-btn toon-btn" data-download-character-multimedia ${focusedAssignedMix ? '' : 'disabled'}>Descargar multimedia</button>
+              <div class="actions" style="justify-content: space-between;">
+                <h4 class="profile-section__title" style="margin:0;">MULTIMEDIA</h4>
+                <button type="button" class="neon-btn toon-btn" data-download-character-multimedia>Descargar</button>
               </div>
-              <form id="characterImageUrlInlineForm" class="character-image-url-form" hidden>
+              <div class="profile-edit-block">
+                <h5>Audios</h5>
+                <label>Voces del personaje (puedes elegir más de una)</label>
+                <div class="detail-list detail-list-soft">
+                  ${(Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).map((voice) => {
+                    const voiceId = String(voice?.id || '').trim();
+                    const checked = audioItemMatchesCharacter(voice, focusedCharacterModel?.id || '');
+                    return `<label style="display:block; margin:.3rem 0;"><input type="checkbox" data-character-voice-id="${escapeHtml(voiceId)}" ${checked ? 'checked' : ''}> ${escapeHtml(voice?.name || 'Voz sin nombre')}</label>`;
+                  }).join('') || '<p class="muted">No hay voces en la galería.</p>'}
+                </div>
+                <label>Fondo del personaje (solo de sus universos)
+                  <select id="characterBackgroundInlineSelect" class="control-input">
+                    <option value="">Sin fondo asignado</option>
+                    ${getAvailableBackgroundsForCharacter(focusedCharacterModel?.id || '').map((background) => `
+                      <option value="${escapeHtml(background.id)}" ${background.id === focusedCharacterMedia.backgroundId ? 'selected' : ''}>${escapeHtml(background.name || 'Fondo sin nombre')}</option>
+                    `).join('')}
+                  </select>
+                </label>
+              </div>
+              <div class="profile-edit-block">
+                <h5>Imágenes</h5>
+                <form id="characterImageUrlInlineForm" class="character-image-url-form">
                 <label>URL de imagen
                   <input id="characterImageUrlInlineInput" type="url" class="control-input" placeholder="https://..." autocomplete="off">
                 </label>
                 <button type="submit" class="neon-btn neon-btn--primary">Guardar</button>
-              </form>
+                </form>
+              </div>
               <section class="character-media-preview-grid">
                 ${focusedCharacterMedia.imageUrls.map((url, index) => `
                   <article class="character-media-preview-card">
@@ -7038,20 +7076,45 @@
             }
           }
         });
-        viewIndice.querySelector('[data-assign-character-audio]')?.addEventListener('click', () => {
+        document.getElementById('characterBackgroundInlineSelect')?.addEventListener('change', (event) => {
+          const nextBackgroundId = String(event.target?.value || '').trim();
+          saveCharacterMedia(focusedCharacterModel?.id || '', { backgroundId: nextBackgroundId });
           const feedback = document.getElementById('indiceCharacterFeedback');
-          openAssignCharacterMixModal(focusedCharacterModel?.id || '', {
-            onAssigned: (nextMixId) => {
-              renderIndiceView();
-              const mixName = nextMixId ? (getAudioLibraryMixById(nextMixId)?.name || 'Audio') : 'ninguno';
-              if (feedback) {
-                feedback.style.color = '#9ff7c8';
-                feedback.textContent = nextMixId
-                  ? `Audio designado correctamente: ${mixName}.`
-                  : 'Audio desasignado correctamente.';
-              }
-            }
+          if (feedback) {
+            feedback.style.color = '#9ff7c8';
+            feedback.textContent = nextBackgroundId ? 'Fondo asignado correctamente.' : 'Fondo removido.';
+          }
+        });
+        viewIndice.querySelectorAll('[data-character-voice-id]').forEach((checkbox) => {
+          checkbox.addEventListener('change', (event) => {
+            const voiceId = String(event.target?.dataset?.characterVoiceId || '').trim();
+            const checked = Boolean(event.target?.checked);
+            const characterId = String(focusedCharacterModel?.id || '').trim();
+            state.audioLibrary.voces = (Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).map((voice) => {
+              if (String(voice?.id || '').trim() !== voiceId) return voice;
+              return { ...voice, characterId: checked ? characterId : '' };
+            });
+            saveAudioLibrary();
           });
+        });
+        document.getElementById('characterImageUrlInlineForm')?.addEventListener('submit', (event) => {
+          event.preventDefault();
+          const input = document.getElementById('characterImageUrlInlineInput');
+          const imageUrl = String(input?.value || '').trim();
+          const feedback = document.getElementById('indiceCharacterFeedback');
+          if (!imageUrl) return;
+          try {
+            new URL(imageUrl, window.location.href);
+          } catch (_) {
+            if (feedback) {
+              feedback.style.color = '#ffb6b6';
+              feedback.textContent = 'La URL de imagen no es válida.';
+            }
+            return;
+          }
+          const nextUrls = [...new Set([...(focusedCharacterMedia.imageUrls || []), imageUrl])];
+          saveCharacterMedia(focusedCharacterModel?.id || '', { imageUrls: nextUrls });
+          renderIndiceView();
         });
 
         // EDICIÓN AVANZADA
