@@ -82,7 +82,7 @@
         backgroundId: '',
         voiceVolume: 1,
         backgroundVolume: 0.6,
-        backgroundStartOffsetSec: 0,
+        voiceDelaySec: 0,
         backgroundPadMode: 'none',
         isPlaying: false,
         previewPositionSec: 0
@@ -2463,12 +2463,15 @@
       backgroundBuffer,
       voiceVolume = 1,
       backgroundVolume = 0.6,
-      backgroundOffset = 0,
+      voiceDelaySec = 0,
       backgroundPadMode = 'none'
     }) {
       const safeVoiceDuration = Math.max(0.01, Number(voiceBuffer?.duration) || 0.01);
+      const safeVoiceDelay = Math.max(0, Number(voiceDelaySec) || 0);
+      const backgroundDuration = Math.max(0, Number(backgroundBuffer?.duration) || 0);
+      const outputDuration = Math.max(safeVoiceDelay + safeVoiceDuration, backgroundDuration, 0.01);
       const sampleRate = voiceBuffer?.sampleRate || backgroundBuffer?.sampleRate || 44100;
-      const length = Math.max(1, Math.ceil(safeVoiceDuration * sampleRate));
+      const length = Math.max(1, Math.ceil(outputDuration * sampleRate));
       const channels = Math.max(voiceBuffer?.numberOfChannels || 1, backgroundBuffer?.numberOfChannels || 1);
       const offlineContext = new OfflineAudioContext(channels, length, sampleRate);
       const output = offlineContext.createGain();
@@ -2481,7 +2484,7 @@
       voiceGain.gain.value = Math.max(0, Number(voiceVolume) || 0);
       voiceSource.connect(voiceGain);
       voiceGain.connect(output);
-      voiceSource.start(0, 0, safeVoiceDuration);
+      voiceSource.start(safeVoiceDelay, 0, safeVoiceDuration);
 
       if (backgroundBuffer) {
         const bgSource = offlineContext.createBufferSource();
@@ -2491,15 +2494,13 @@
         bgSource.connect(bgGain);
         bgGain.connect(output);
 
-        const safeOffset = Math.max(0, Number(backgroundOffset) || 0);
-        const availableDuration = Math.max(0, backgroundBuffer.duration - safeOffset);
-        const bgDuration = Math.min(safeVoiceDuration, availableDuration);
+        const bgDuration = Math.min(outputDuration, backgroundBuffer.duration);
         const normalizedPadMode = String(backgroundPadMode || 'none').toLowerCase();
-        const bgStartAt = normalizedPadMode === 'padstart' && bgDuration < safeVoiceDuration
-          ? safeVoiceDuration - bgDuration
+        const bgStartAt = normalizedPadMode === 'padstart' && bgDuration < outputDuration
+          ? outputDuration - bgDuration
           : 0;
         if (bgDuration > 0) {
-          bgSource.start(bgStartAt, safeOffset, bgDuration);
+          bgSource.start(bgStartAt, 0, bgDuration);
         }
       }
 
@@ -8629,9 +8630,9 @@
       viewAudioMixer.innerHTML = `
         <section class="mock-shell">
           <h2>🎚️ Mezclador de audios</h2>
-          <p class="muted">Combina una voz con un fondo y configura volúmenes, offset y estirado.</p>
+          <p class="muted">Combina una voz con un fondo y configura volúmenes, espera de voz y estirado.</p>
           <div class="audio-upload-inline">
-            <button class="neon-btn toon-btn" data-audio-mixer-preview>Previsualizar</button>
+            <button class="neon-btn toon-btn" data-audio-mixer-preview>▶️ Play</button>
             <button class="neon-btn toon-btn" data-audio-mixer-pause>Pausar</button>
             <button class="neon-btn toon-btn" data-audio-mixer-save>Guardar</button>
             <button class="neon-btn toon-btn" data-back-audio-gallery>← Volver a Galería de audios</button>
@@ -8639,27 +8640,34 @@
         </section>
         <section class="panel">
           <h3>Parámetros de mezcla</h3>
-          <div class="audio-upload-inline" style="flex-direction: column; align-items: stretch;">
-            <label>Voz
+          <div class="audio-mixer-layout">
+            <article class="audio-mixer-section">
+              <h4>Voces</h4>
+              <label>Selecciona voz
               <select class="control-input" data-audio-mixer-voice>
                 <option value="">Selecciona una voz</option>
                 ${voces.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === state.audioMixer.voiceId ? 'selected' : ''}>${escapeHtml(item.name || 'Voz sin nombre')}</option>`).join('')}
               </select>
             </label>
-            <label>Fondo
+              <button type="button" class="neon-btn" data-audio-mixer-edit-voice ${state.audioMixer.voiceId ? '' : 'disabled'}>✂️ Editar voz</button>
+              <label>Volumen voz: <span data-audio-mixer-voice-volume-value>${Number(state.audioMixer.voiceVolume || 0).toFixed(2)}</span>
+                <input type="range" min="0" max="1.5" step="0.01" class="control-input" data-audio-mixer-voice-volume value="${Number(state.audioMixer.voiceVolume || 0)}">
+              </label>
+              <label>Espera de la voz (segundos)
+                <input type="number" min="0" step="0.1" class="control-input" data-audio-mixer-voice-delay value="${Number(state.audioMixer.voiceDelaySec || 0)}">
+              </label>
+            </article>
+            <article class="audio-mixer-section">
+              <h4>Fondos</h4>
+              <label>Selecciona fondo
               <select class="control-input" data-audio-mixer-background>
                 <option value="">Selecciona un fondo</option>
                 ${fondos.map((item) => `<option value="${escapeHtml(item.id)}" ${item.id === state.audioMixer.backgroundId ? 'selected' : ''}>${escapeHtml(item.name || 'Fondo sin nombre')}</option>`).join('')}
               </select>
             </label>
-            <label>Volumen voz: <span data-audio-mixer-voice-volume-value>${Number(state.audioMixer.voiceVolume || 0).toFixed(2)}</span>
-              <input type="range" min="0" max="1.5" step="0.01" class="control-input" data-audio-mixer-voice-volume value="${Number(state.audioMixer.voiceVolume || 0)}">
-            </label>
+              <button type="button" class="neon-btn" data-audio-mixer-edit-background ${state.audioMixer.backgroundId ? '' : 'disabled'}>✂️ Editar fondo</button>
             <label>Volumen fondo: <span data-audio-mixer-background-volume-value>${Number(state.audioMixer.backgroundVolume || 0).toFixed(2)}</span>
               <input type="range" min="0" max="1.5" step="0.01" class="control-input" data-audio-mixer-background-volume value="${Number(state.audioMixer.backgroundVolume || 0)}">
-            </label>
-            <label>Offset inicio fondo (segundos)
-              <input type="number" min="0" step="0.1" class="control-input" data-audio-mixer-background-offset value="${Number(state.audioMixer.backgroundStartOffsetSec || 0)}">
             </label>
             <label>Estirado del fondo
               <select class="control-input" data-audio-mixer-pad-mode>
@@ -8668,6 +8676,7 @@
                 <option value="padEnd" ${state.audioMixer.backgroundPadMode === 'padEnd' ? 'selected' : ''}>Pad al final</option>
               </select>
             </label>
+            </article>
             <p class="audio-library-feedback" aria-live="polite" data-audio-mixer-feedback>
               Estado: ${state.audioMixer.isPlaying ? 'Reproduciendo previsualización' : 'En pausa'} · Posición: ${Number(state.audioMixer.previewPositionSec || 0).toFixed(1)}s
             </p>
@@ -8687,9 +8696,11 @@
       viewAudioMixer.querySelector('[data-back-audio-gallery]')?.addEventListener('click', () => changeView('audioGallery'));
       viewAudioMixer.querySelector('[data-audio-mixer-voice]')?.addEventListener('change', (event) => {
         state.audioMixer.voiceId = String(event.target?.value || '');
+        renderAudioMixerView();
       });
       viewAudioMixer.querySelector('[data-audio-mixer-background]')?.addEventListener('change', (event) => {
         state.audioMixer.backgroundId = String(event.target?.value || '');
+        renderAudioMixerView();
       });
       viewAudioMixer.querySelector('[data-audio-mixer-voice-volume]')?.addEventListener('input', (event) => {
         state.audioMixer.voiceVolume = Math.max(0, Number(event.target?.value) || 0);
@@ -8699,8 +8710,16 @@
         state.audioMixer.backgroundVolume = Math.max(0, Number(event.target?.value) || 0);
         syncBackgroundVolumeLabel();
       });
-      viewAudioMixer.querySelector('[data-audio-mixer-background-offset]')?.addEventListener('input', (event) => {
-        state.audioMixer.backgroundStartOffsetSec = Math.max(0, Number(event.target?.value) || 0);
+      viewAudioMixer.querySelector('[data-audio-mixer-voice-delay]')?.addEventListener('input', (event) => {
+        state.audioMixer.voiceDelaySec = Math.max(0, Number(event.target?.value) || 0);
+      });
+      viewAudioMixer.querySelector('[data-audio-mixer-edit-voice]')?.addEventListener('click', () => {
+        if (!state.audioMixer.voiceId) return;
+        openAudioTrimEditorModal('voces', state.audioMixer.voiceId);
+      });
+      viewAudioMixer.querySelector('[data-audio-mixer-edit-background]')?.addEventListener('click', () => {
+        if (!state.audioMixer.backgroundId) return;
+        openAudioTrimEditorModal('fondos', state.audioMixer.backgroundId);
       });
       viewAudioMixer.querySelector('[data-audio-mixer-pad-mode]')?.addEventListener('change', (event) => {
         const validModes = ['none', 'padStart', 'padEnd'];
@@ -8745,7 +8764,7 @@
             backgroundBuffer,
             voiceVolume: state.audioMixer.voiceVolume,
             backgroundVolume: state.audioMixer.backgroundVolume,
-            backgroundOffset: state.audioMixer.backgroundStartOffsetSec,
+            voiceDelaySec: state.audioMixer.voiceDelaySec,
             backgroundPadMode: state.audioMixer.backgroundPadMode
           });
           const blob = audioBufferToWavBlob(mixedBuffer);
