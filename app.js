@@ -86,7 +86,8 @@
         backgroundFadeOutEnabled: false,
         backgroundPadMode: 'none',
         isPlaying: false,
-        previewPositionSec: 0
+        previewPositionSec: 0,
+        customBackgroundByVoiceId: {}
       },
       uploadStatusByCategory: {
         voces: { loading: false, error: '', success: '' },
@@ -2655,10 +2656,12 @@
       saveAudioLibrary();
     }
 
-    async function openAudioTrimEditorModal(category, audioId) {
+    async function openAudioTrimEditorModal(category, audioId, options = {}) {
       const normalizedCategory = category === 'fondos' ? 'fondos' : 'voces';
+      const persistInLibrary = options?.persistInLibrary !== false;
+      const sourceAudioItem = options?.audioItem || null;
       const items = Array.isArray(state.audioLibrary?.[normalizedCategory]) ? state.audioLibrary[normalizedCategory] : [];
-      const audioItem = items.find((item) => item.id === audioId);
+      const audioItem = sourceAudioItem || items.find((item) => item.id === audioId);
       if (!audioItem?.url) return;
 
       const modal = document.createElement('section');
@@ -2843,16 +2846,23 @@
           feedbackEl.textContent = 'Guardando audio recortado...';
           try {
             const outputBlob = audioBufferToWavBlob(workingBuffer);
-            await replaceAudioLibraryItemContent(normalizedCategory, audioId, outputBlob);
-            if (nameInput && nameInput.value.trim() !== String(audioItem.name || '').trim()) {
-              renameAudioLibraryItem(normalizedCategory, audioId, nameInput.value.trim());
+            if (persistInLibrary) {
+              await replaceAudioLibraryItemContent(normalizedCategory, audioId, outputBlob);
+              if (nameInput && nameInput.value.trim() !== String(audioItem.name || '').trim()) {
+                renameAudioLibraryItem(normalizedCategory, audioId, nameInput.value.trim());
+              }
+              setAudioUploadStatus(normalizedCategory, {
+                loading: false,
+                error: '',
+                success: `Audio "${nameInput?.value?.trim() || audioItem.name || 'sin nombre'}" actualizado y guardado.`
+              });
+              renderAudioCategoryView(normalizedCategory);
+            } else if (typeof options?.onSave === 'function') {
+              await options.onSave({
+                blob: outputBlob,
+                name: nameInput?.value?.trim() || audioItem.name || 'Audio'
+              });
             }
-            setAudioUploadStatus(normalizedCategory, {
-              loading: false,
-              error: '',
-              success: `Audio "${nameInput?.value?.trim() || audioItem.name || 'sin nombre'}" actualizado y guardado.`
-            });
-            renderAudioCategoryView(normalizedCategory);
             closeModal();
           } catch (err) {
             feedbackEl.classList.add('is-error');
@@ -8796,6 +8806,25 @@
       if (feedback) feedback.textContent = `Estado: En pausa · Posición: ${Number(state.audioMixer.previewPositionSec || 0).toFixed(1)}s`;
     }
 
+    function getMixerBackgroundOverride(voiceId, backgroundId) {
+      const cleanVoiceId = String(voiceId || '').trim();
+      const cleanBackgroundId = String(backgroundId || '').trim();
+      if (!cleanVoiceId || !cleanBackgroundId) return null;
+      const byVoice = state.audioMixer?.customBackgroundByVoiceId || {};
+      return byVoice?.[cleanVoiceId]?.[cleanBackgroundId] || null;
+    }
+
+    function getMixerBackgroundAudioItem(voiceId, backgroundItem) {
+      if (!backgroundItem) return null;
+      const override = getMixerBackgroundOverride(voiceId, backgroundItem.id);
+      if (!override?.url) return backgroundItem;
+      return {
+        ...backgroundItem,
+        url: override.url,
+        name: override.name || backgroundItem.name
+      };
+    }
+
     function renderAudioMixerView() {
       const voces = Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : [];
       const fondos = Array.isArray(state.audioLibrary?.fondos) ? state.audioLibrary.fondos : [];
@@ -8891,7 +8920,29 @@
       });
       viewAudioMixer.querySelector('[data-audio-mixer-edit-background]')?.addEventListener('click', () => {
         if (!state.audioMixer.backgroundId) return;
-        openAudioTrimEditorModal('fondos', state.audioMixer.backgroundId);
+        const selectedBackground = fondos.find((item) => item.id === state.audioMixer.backgroundId);
+        if (!selectedBackground || !state.audioMixer.voiceId) return;
+        const editableBackground = getMixerBackgroundAudioItem(state.audioMixer.voiceId, selectedBackground);
+        openAudioTrimEditorModal('fondos', state.audioMixer.backgroundId, {
+          persistInLibrary: false,
+          audioItem: editableBackground,
+          onSave: async ({ blob, name }) => {
+            const url = URL.createObjectURL(blob);
+            const voiceId = String(state.audioMixer.voiceId || '').trim();
+            const backgroundId = String(state.audioMixer.backgroundId || '').trim();
+            if (!voiceId || !backgroundId) return;
+            const byVoice = state.audioMixer.customBackgroundByVoiceId || {};
+            state.audioMixer.customBackgroundByVoiceId = {
+              ...byVoice,
+              [voiceId]: {
+                ...(byVoice[voiceId] || {}),
+                [backgroundId]: { url, name }
+              }
+            };
+            const feedback = viewAudioMixer.querySelector('[data-audio-mixer-feedback]');
+            if (feedback) feedback.textContent = 'Fondo personalizado guardado solo para esta voz. En galería se mantiene el audio completo.';
+          }
+        });
       });
       viewAudioMixer.querySelector('[data-audio-mixer-fadeout]')?.addEventListener('click', () => {
         state.audioMixer.backgroundFadeOutEnabled = !state.audioMixer.backgroundFadeOutEnabled;
@@ -8900,7 +8951,8 @@
       viewAudioMixer.querySelector('[data-audio-mixer-preview]')?.addEventListener('click', async () => {
         const feedback = viewAudioMixer.querySelector('[data-audio-mixer-feedback]');
         const voiceItem = voces.find((item) => item.id === state.audioMixer.voiceId);
-        const backgroundItem = fondos.find((item) => item.id === state.audioMixer.backgroundId);
+        const selectedBackground = fondos.find((item) => item.id === state.audioMixer.backgroundId);
+        const backgroundItem = getMixerBackgroundAudioItem(state.audioMixer.voiceId, selectedBackground);
         if (!voiceItem || !getAudioItemUrl(voiceItem) || !backgroundItem || !getAudioItemUrl(backgroundItem)) {
           if (feedback) feedback.textContent = 'Selecciona una voz y un fondo válidos para previsualizar.';
           return;
@@ -8946,7 +8998,8 @@
         const saveBtn = event.currentTarget;
         const feedback = viewAudioMixer.querySelector('[data-audio-mixer-feedback]');
         const voiceItem = voces.find((item) => item.id === state.audioMixer.voiceId);
-        const backgroundItem = fondos.find((item) => item.id === state.audioMixer.backgroundId);
+        const selectedBackground = fondos.find((item) => item.id === state.audioMixer.backgroundId);
+        const backgroundItem = getMixerBackgroundAudioItem(state.audioMixer.voiceId, selectedBackground);
         if (!voiceItem || !getAudioItemUrl(voiceItem)) {
           if (feedback) feedback.textContent = 'Selecciona una voz válida antes de guardar.';
           return;
