@@ -571,7 +571,8 @@
         audioLibrary: normalizeAudioLibrary({
           ...(rawModel.audioLibrary && typeof rawModel.audioLibrary === 'object' ? rawModel.audioLibrary : {}),
           ...(rawModel.mezclas && typeof rawModel.mezclas === 'object' ? { mezclas: rawModel.mezclas } : {})
-        })
+        }),
+        characterMedia: normalizeCharacterMediaMap(rawModel.characterMedia)
       };
     }
 
@@ -5546,7 +5547,12 @@
       const modelCharacter = getCharacterModelRecordByProfileId(profileId);
       const modelId = String(modelCharacter?.id || '').trim();
       const mediaMap = ensureCollectionModelCharacterMedia(collectionModel);
-      const media = normalizeCharacterMediaEntry(mediaMap[profileId] || mediaMap[modelId]);
+      const fallbackFromCharacter = normalizeCharacterMediaEntry({
+        imageUrls: modelCharacter?.imageUrls,
+        backgroundId: modelCharacter?.selectedBackgroundId,
+        mixUrl: modelCharacter?.assignedMixAudioId
+      });
+      const media = normalizeCharacterMediaEntry(mediaMap[profileId] || mediaMap[modelId] || fallbackFromCharacter);
       mediaMap[profileId] = media;
       if (modelId && modelId !== profileId) delete mediaMap[modelId];
       return media;
