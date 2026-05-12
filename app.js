@@ -1641,6 +1641,7 @@
           ? [...new Set(entry.imageUrls.map((url) => String(url || '').trim()).filter(Boolean))]
           : [],
         backgroundId: String(entry.backgroundId || ''),
+        voiceId: String(entry.voiceId || entry.vozId || ''),
         mixUrl: String(entry.mixUrl || '')
       };
     }
@@ -6878,7 +6879,11 @@
         const focusedCharacterModel = (collectionModel.characters || [])
           .find((character) => normalizeName(character?.name || '') === normalizeName(focusedCharacter));
         const focusedAssignedMix = getAssignedMixForCharacterId(focusedCharacterModel?.id || '');
-        const focusedCharacterMedia = getCharacterMedia(focusedCharacterModel?.id || focusedCharacterId || focusedCharacter);
+        const focusedCharacterMedia = normalizeCharacterMediaEntry(getCharacterMedia(focusedCharacterModel?.id || focusedCharacterId || focusedCharacter));
+        if (!focusedCharacterMedia.voiceId) {
+          const assignedVoice = (Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).find((voice) => audioItemMatchesCharacter(voice, focusedCharacterModel?.id || ''));
+          focusedCharacterMedia.voiceId = String(assignedVoice?.id || '').trim();
+        }
 
         const profileAvatarMarkup = isCharacterLocked
           ? `
@@ -6987,14 +6992,17 @@
               </div>
               <div class="profile-edit-block">
                 <h5>Audios</h5>
-                <label>Voces del personaje (puedes elegir más de una)</label>
-                <div class="detail-list detail-list-soft">
-                  ${(Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).map((voice) => {
-                    const voiceId = String(voice?.id || '').trim();
-                    const checked = audioItemMatchesCharacter(voice, focusedCharacterModel?.id || '');
-                    return `<label style="display:block; margin:.3rem 0;"><input type="checkbox" data-character-voice-id="${escapeHtml(voiceId)}" ${checked ? 'checked' : ''}> ${escapeHtml(voice?.name || 'Voz sin nombre')}</label>`;
-                  }).join('') || '<p class="muted">No hay voces en la galería.</p>'}
-                </div>
+                <label>Voz
+                  <select id="characterVoiceInlineSelect" class="control-input">
+                    <option value="">Sin voz asignada</option>
+                    ${(Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).map((voice) => {
+                      const voiceId = String(voice?.id || '').trim();
+                      const selected = voiceId && voiceId === focusedCharacterMedia.voiceId;
+                      return `<option value="${escapeHtml(voiceId)}" ${selected ? 'selected' : ''}>${escapeHtml(voice?.name || 'Voz sin nombre')}</option>`;
+                    }).join('')}
+                  </select>
+                </label>
+                ${(Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).length ? '' : '<p class="muted">No hay voces en la galería.</p>'}
                 <label>Fondo del personaje (solo de sus universos)
                   <select id="characterBackgroundInlineSelect" class="control-input">
                     <option value="">Sin fondo asignado</option>
@@ -7085,17 +7093,26 @@
             feedback.textContent = nextBackgroundId ? 'Fondo asignado correctamente.' : 'Fondo removido.';
           }
         });
-        viewIndice.querySelectorAll('[data-character-voice-id]').forEach((checkbox) => {
-          checkbox.addEventListener('change', (event) => {
-            const voiceId = String(event.target?.dataset?.characterVoiceId || '').trim();
-            const checked = Boolean(event.target?.checked);
-            const characterId = String(focusedCharacterModel?.id || '').trim();
-            state.audioLibrary.voces = (Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).map((voice) => {
-              if (String(voice?.id || '').trim() !== voiceId) return voice;
-              return { ...voice, characterId: checked ? characterId : '' };
-            });
-            saveAudioLibrary();
+        document.getElementById('characterVoiceInlineSelect')?.addEventListener('change', (event) => {
+          const selectedVoiceId = String(event.target?.value || '').trim();
+          const characterId = String(focusedCharacterModel?.id || '').trim();
+          state.audioLibrary.voces = (Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : []).map((voice) => {
+            const voiceId = String(voice?.id || '').trim();
+            if (audioItemMatchesCharacter(voice, characterId) && voiceId !== selectedVoiceId) {
+              return { ...voice, characterId: '' };
+            }
+            if (voiceId === selectedVoiceId) {
+              return { ...voice, characterId };
+            }
+            return voice;
           });
+          saveAudioLibrary();
+          saveCharacterMedia(characterId, { voiceId: selectedVoiceId });
+          const feedback = document.getElementById('indiceCharacterFeedback');
+          if (feedback) {
+            feedback.style.color = '#9ff7c8';
+            feedback.textContent = selectedVoiceId ? 'Voz asignada correctamente.' : 'Voz removida.';
+          }
         });
         document.getElementById('characterImageUrlInlineForm')?.addEventListener('submit', (event) => {
           event.preventDefault();
