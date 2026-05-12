@@ -83,6 +83,7 @@
         voiceVolume: 1,
         backgroundVolume: 0.6,
         voiceDelaySec: 0,
+        backgroundFadeOutEnabled: false,
         backgroundPadMode: 'none',
         isPlaying: false,
         previewPositionSec: 0
@@ -2485,6 +2486,7 @@
       voiceVolume = 1,
       backgroundVolume = 0.6,
       voiceDelaySec = 0,
+      backgroundFadeOutEnabled = false,
       backgroundPadMode = 'none'
     }) {
       const safeVoiceDuration = Math.max(0.01, Number(voiceBuffer?.duration) || 0.01);
@@ -2521,6 +2523,13 @@
           ? outputDuration - bgDuration
           : 0;
         if (bgDuration > 0) {
+          if (backgroundFadeOutEnabled) {
+            const fadeDuration = Math.min(3, bgDuration);
+            const fadeStartAt = Math.max(bgStartAt, (bgStartAt + bgDuration) - fadeDuration);
+            bgGain.gain.setValueAtTime(Math.max(0, Number(backgroundVolume) || 0), 0);
+            bgGain.gain.setValueAtTime(Math.max(0, Number(backgroundVolume) || 0), fadeStartAt);
+            bgGain.gain.linearRampToValueAtTime(0, bgStartAt + bgDuration);
+          }
           bgSource.start(bgStartAt, 0, bgDuration);
         }
       }
@@ -8763,6 +8772,7 @@
           <div class="audio-upload-inline">
             <button class="neon-btn toon-btn" data-audio-mixer-preview>▶️ Play</button>
             <button class="neon-btn toon-btn" data-audio-mixer-pause>Pausar</button>
+            <button class="neon-btn toon-btn" data-audio-mixer-fadeout>${state.audioMixer.backgroundFadeOutEnabled ? 'Atenuante: ON' : 'Atenuante: OFF'}</button>
             <button class="neon-btn toon-btn" data-audio-mixer-save>Guardar</button>
             <button class="neon-btn toon-btn" data-back-audio-gallery>← Volver a Galería de audios</button>
           </div>
@@ -8843,6 +8853,10 @@
         if (!state.audioMixer.backgroundId) return;
         openAudioTrimEditorModal('fondos', state.audioMixer.backgroundId);
       });
+      viewAudioMixer.querySelector('[data-audio-mixer-fadeout]')?.addEventListener('click', () => {
+        state.audioMixer.backgroundFadeOutEnabled = !state.audioMixer.backgroundFadeOutEnabled;
+        renderAudioMixerView();
+      });
       viewAudioMixer.querySelector('[data-audio-mixer-preview]')?.addEventListener('click', async () => {
         const feedback = viewAudioMixer.querySelector('[data-audio-mixer-feedback]');
         const voiceItem = voces.find((item) => item.id === state.audioMixer.voiceId);
@@ -8863,6 +8877,7 @@
             voiceVolume: state.audioMixer.voiceVolume,
             backgroundVolume: state.audioMixer.backgroundVolume,
             voiceDelaySec: state.audioMixer.voiceDelaySec,
+            backgroundFadeOutEnabled: state.audioMixer.backgroundFadeOutEnabled,
             backgroundPadMode: 'none'
           });
           const audioContext = getSharedAudioContext();
@@ -8913,6 +8928,7 @@
             voiceVolume: state.audioMixer.voiceVolume,
             backgroundVolume: state.audioMixer.backgroundVolume,
             voiceDelaySec: state.audioMixer.voiceDelaySec,
+            backgroundFadeOutEnabled: state.audioMixer.backgroundFadeOutEnabled,
             backgroundPadMode: 'none'
           });
           const blob = audioBufferToWavBlob(mixedBuffer);
