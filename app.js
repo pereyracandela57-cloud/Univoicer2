@@ -5694,7 +5694,7 @@
       const characterMedia = getCharacterMedia(characterId);
       const characterVoices = (Array.isArray(state.audioLibrary?.voces) ? state.audioLibrary.voces : [])
         .filter((voice) => audioItemMatchesCharacter(voice, characterId));
-      const availableBackgrounds = Array.isArray(state.audioLibrary?.fondos) ? state.audioLibrary.fondos : [];
+      const availableBackgrounds = getAvailableBackgroundsForCharacter(characterId);
       const selectedBackgroundId = availableBackgrounds.some((background) => background.id === characterMedia.backgroundId)
         ? characterMedia.backgroundId
         : '';
@@ -5769,6 +5769,13 @@
           <article class="profile-section">
             <h4>Multimedia asignada</h4>
             <p class="muted">${assignedMix ? `Mezcla asignada: ${escapeHtml(assignedMix.name || 'Mezcla sin nombre')}.` : 'Sin mezcla asignada.'}</p>
+            ${assignedMix ? `
+              <div class="profile-edit-block">
+                <label>Mezcla
+                  <button id="playAssignedMixBtn" type="button" class="neon-btn">▶️ ${escapeHtml(assignedMix.name || 'Mezcla sin nombre')}</button>
+                </label>
+              </div>
+            ` : ''}
             <div class="actions"><button id="downloadCharacterMultimediaBtn" class="neon-btn" ${assignedMix ? '' : 'disabled'}>Descargar multimedia</button></div>
           </article>
         </section>
@@ -5903,6 +5910,23 @@
         refreshDependentViews();
         renderCharacterProfile(characterId);
         setCharacterProfileFeedback(existingUniverse ? 'Universo existente vinculado correctamente.' : 'Universo creado y vinculado correctamente.');
+      });
+      document.getElementById('downloadCharacterMultimediaBtn')?.addEventListener('click', async () => {
+        try {
+          const message = await downloadCharacterMultimedia(characterId);
+          setCharacterProfileFeedback(message);
+        } catch (error) {
+          setCharacterProfileFeedback(error?.message || 'No pudimos descargar la multimedia del personaje.', 'error');
+        }
+      });
+      document.getElementById('playAssignedMixBtn')?.addEventListener('click', async () => {
+        if (!assignedMix) return;
+        try {
+          await playAudioLibraryItemPreview(assignedMix);
+          setCharacterProfileFeedback(`Reproduciendo mezcla: ${assignedMix.name || 'Mezcla sin nombre'}.`);
+        } catch (error) {
+          setCharacterProfileFeedback(error?.message || 'No pudimos reproducir la mezcla asignada.', 'error');
+        }
       });
     }
 
