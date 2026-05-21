@@ -57,6 +57,7 @@
       indiceSearch: '',
       indiceFilters: { universe: 'todos', actor: 'todos', role: 'todos', roleCategory: 'todos' },
       indiceCharacterFocus: null,
+      indiceCharacterOpenMode: 'view',
       showAddCharacterForm: false,
       draftCharacterActors: [],
       draftCharacterFeedback: '',
@@ -6885,6 +6886,7 @@
       clearIndicePreviewTimer();
       removeIndicePreviewPopover();
       const focusedCharacter = state.indiceCharacterFocus;
+      const isIndiceCharacterEditMode = state.indiceCharacterOpenMode === 'edit';
       
       if (focusedCharacter) {
         // Datos del personaje
@@ -6985,13 +6987,12 @@
                 </div>
               </div>
               <div class="character-hero__actions">
-                <button id="editCharacterBtn" class="neon-btn neon-btn--primary toon-btn toon-btn--primary character-hero__icon-btn" title="Editar personaje" aria-label="Editar personaje">✏️</button>
-                <button id="deleteCharacterBtn" class="neon-btn toon-btn toon-btn--danger character-hero__icon-btn" title="Eliminar personaje" aria-label="Eliminar personaje">🗑️</button>
+                ${isIndiceCharacterEditMode ? '<button id="editCharacterBtn" class="neon-btn neon-btn--primary toon-btn toon-btn--primary character-hero__icon-btn" title="Editar personaje" aria-label="Editar personaje">✏️</button><button id="deleteCharacterBtn" class="neon-btn toon-btn toon-btn--danger character-hero__icon-btn" title="Eliminar personaje" aria-label="Eliminar personaje">🗑️</button>' : ''}
               </div>
             </div>
 
             <p id="indiceCharacterFeedback" class="inline-feedback character-feedback" aria-live="polite"></p>
-            <form id="characterInlineEditForm" class="character-inline-editor" ${state.showCharacterInlineEdit ? '' : 'hidden'}>
+            ${isIndiceCharacterEditMode ? `<form id="characterInlineEditForm" class="character-inline-editor" ${state.showCharacterInlineEdit ? '' : 'hidden'}>` : ''}
               <div class="character-inline-editor__grid">
                 <label>Nombre del personaje
                   <input type="text" name="characterName" value="${focusedCharacter}">
@@ -7039,14 +7040,13 @@
                 <button type="button" id="cancelCharacterEdit" class="neon-btn">Cancelar</button>
               </div>
               <p class="muted">Selecciona un actor o universo y el selector se cerrará automáticamente. Haz clic en una etiqueta para quitarla.</p>
-            </form>
-            <section id="characterInlineDeletePanel" class="character-inline-editor" ${state.showCharacterInlineDelete ? '' : 'hidden'}>
+            ${isIndiceCharacterEditMode ? `</form><section id="characterInlineDeletePanel" class="character-inline-editor" ${state.showCharacterInlineDelete ? '' : 'hidden'}>` : ''}
               <p style="margin:0;">¿Seguro que deseas eliminar al personaje <strong>${focusedCharacter}</strong> por completo?</p>
               <div class="character-inline-editor__actions">
                 <button type="button" id="confirmDeleteCharacterBtn" class="neon-btn toon-btn toon-btn--danger">Confirmar eliminación</button>
                 <button type="button" id="cancelDeleteCharacterBtn" class="neon-btn">Cancelar</button>
               </div>
-            </section>
+            ${isIndiceCharacterEditMode ? `</section>` : ''}
 
             <article class="profile-section">
               <div class="actions" style="justify-content: space-between;">
@@ -7086,7 +7086,7 @@
               </div>
               <div class="profile-edit-block">
                 <h5>Imágenes</h5>
-                <form id="characterImageUrlInlineForm" class="character-image-url-form">
+                ${isIndiceCharacterEditMode ? '<form id="characterImageUrlInlineForm" class="character-image-url-form">' : ''}
                 <label>URL de imagen
                   <input id="characterImageUrlInlineInput" type="url" class="control-input" placeholder="https://..." autocomplete="off">
                 </label>
@@ -7099,7 +7099,7 @@
                     <img src="${escapeHtml(url)}" alt="Imagen multimedia ${index + 1} de ${escapeHtml(focusedCharacter)}" loading="lazy">
                     <div class="actions">
                       <a href="${escapeHtml(url)}" class="neon-btn" target="_blank" rel="noopener">Abrir</a>
-                      <button type="button" class="neon-btn toon-btn toon-btn--danger" data-delete-indice-character-image="${index}">Eliminar</button>
+                      ${isIndiceCharacterEditMode ? `<button type="button" class="neon-btn toon-btn toon-btn--danger" data-delete-indice-character-image="${index}">Eliminar</button>` : ''}
                     </div>
                   </article>
                 `).join('') || '<p class="muted">Sin imágenes guardadas.</p>'}
@@ -7114,7 +7114,7 @@
                     <article class="character-actor-card locked" aria-disabled="true">
                       <div class="locked-mic" role="img" aria-label="Actor bloqueado">🎙️</div>
                       <div class="meta">
-                        <h3><button type="button" class="actor-name-btn" data-open-actor-profile="${item.actorName}" aria-label="Abrir perfil de ${item.actorName}">${item.actorName}</button> <button type="button" class="neon-btn actor-add-btn" data-add-greeting-actor="${item.actorName}" aria-label="Agregar video para ${item.actorName}">+</button></h3>
+                        <h3><button type="button" class="actor-name-btn" data-open-actor-profile="${item.actorName}" aria-label="Abrir perfil de ${item.actorName}">${item.actorName}</button> ${isIndiceCharacterEditMode ? `<button type="button" class="neon-btn actor-add-btn" data-add-greeting-actor="${item.actorName}" aria-label="Agregar video para ${item.actorName}">+</button>` : ''}</h3>
                         <p class="locked-note">Bloqueado</p>
                       </div>
                     </article>
@@ -7123,7 +7123,7 @@
                     <article class="character-actor-card unlocked">
                       <img src="${getActorCardThumbnail(item.video, item.actorName)}" alt="Miniatura de ${item.actorName} como ${focusedCharacter}" loading="lazy" onerror="this.onerror=null;this.src='${createPlaceholderCover(item.actorName)}';this.dataset.fallback='true';">
                       <div class="meta">
-                        <h3><button type="button" class="actor-name-btn" data-open-actor-profile="${item.actorName}" aria-label="Abrir perfil de ${item.actorName}">${item.actorName}</button> <button type="button" class="neon-btn add-greeting-btn actor-add-btn" data-add-greeting-actor="${item.actorName}" aria-label="Agregar otro video para ${item.actorName}">+</button></h3>
+                        <h3><button type="button" class="actor-name-btn" data-open-actor-profile="${item.actorName}" aria-label="Abrir perfil de ${item.actorName}">${item.actorName}</button> ${isIndiceCharacterEditMode ? `<button type="button" class="neon-btn add-greeting-btn actor-add-btn" data-add-greeting-actor="${item.actorName}" aria-label="Agregar otro video para ${item.actorName}">+</button>` : ''}</h3>
                         <div class="character-audio-actions">
                           <button type="button" class="neon-btn" data-open-video="${item.video.id}">ABRIR ESCENA</button>
                         </div>
@@ -7138,6 +7138,7 @@
 
         document.getElementById('backToCharacterGallery')?.addEventListener('click', () => {
           state.indiceCharacterFocus = null;
+          state.indiceCharacterOpenMode = 'view';
           renderIndiceView();
         });
 
@@ -7243,6 +7244,7 @@
           renderIndiceView();
         });
 
+        if (isIndiceCharacterEditMode) {
         // EDICIÓN AVANZADA
         document.getElementById('editCharacterBtn')?.addEventListener('click', () => {
           state.showCharacterInlineEdit = !state.showCharacterInlineEdit;
@@ -7440,6 +7442,7 @@
             renderIndiceView();
           });
         });
+        }
         return;
       }
 
@@ -7621,6 +7624,17 @@
       viewIndice.querySelectorAll('[data-open-character]').forEach((btn) => {
         btn.addEventListener('click', () => {
           state.indiceCharacterFocus = btn.dataset.openCharacter;
+          state.indiceCharacterOpenMode = 'view';
+          renderIndiceView();
+        });
+      });
+      viewIndice.querySelectorAll('.character-gallery-card').forEach((card) => {
+        card.addEventListener('contextmenu', (event) => {
+          event.preventDefault();
+          state.indiceCharacterFocus = card.dataset.openCharacter || '';
+          state.indiceCharacterOpenMode = 'edit';
+          state.showCharacterInlineEdit = false;
+          state.showCharacterInlineDelete = false;
           renderIndiceView();
         });
       });
@@ -7846,7 +7860,7 @@
                     <button type="button" id="cancelMarathonCreateBtn" class="neon-btn">Cancelar</button>
                     <button type="submit" class="neon-btn toon-btn toon-btn--primary">Guardar</button>
                   </div>
-                </form>
+                ${isIndiceCharacterEditMode ? '</form>' : ''}
               </div>
             </div>
           ` : ''}
