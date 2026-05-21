@@ -6979,7 +6979,7 @@
                 <div class="detail-meta character-hero__badges">
                   ${universos.map((universe) => {
                     const universeLabel = String(universe || '').trim() || SPECIAL_UNASSIGNED_UNIVERSE;
-                    return `<button type="button" class="badge character-hero__badge character-hero__badge--universes character-hero__badge--universe-red character-hero__badge--universe-link" data-open-universe-profile="${escapeHtml(universeLabel)}" aria-label="Abrir perfil del universo ${escapeHtml(universeLabel)}"><span class="character-hero__universe-name">${escapeHtml(universeLabel)}</span></button>`;
+                    return `<span class="badge character-hero__badge character-hero__badge--universes character-hero__badge--universe-red"><span class="character-hero__universe-name">${escapeHtml(universeLabel)}</span></span>`;
                   }).join('') || `<span class="badge character-hero__badge character-hero__badge--universes character-hero__badge--universe-red"><span class="character-hero__universe-name">${SPECIAL_UNASSIGNED_UNIVERSE}</span></span>`}
                   <span class="badge character-hero__badge character-hero__badge--role character-hero__badge--role-inline ${focusedRoleClass}">${focusedRoleLabel}</span>
                 </div>
@@ -7125,7 +7125,7 @@
                       <div class="meta">
                         <h3><button type="button" class="actor-name-btn" data-open-actor-profile="${item.actorName}" aria-label="Abrir perfil de ${item.actorName}">${item.actorName}</button> <button type="button" class="neon-btn add-greeting-btn actor-add-btn" data-add-greeting-actor="${item.actorName}" aria-label="Agregar otro video para ${item.actorName}">+</button></h3>
                         <div class="character-audio-actions">
-                          <button type="button" class="neon-btn" data-open-video="${item.video.id}">▶ Ver video</button>
+                          <button type="button" class="neon-btn" data-open-video="${item.video.id}">ABRIR ESCENA</button>
                         </div>
                       </div>
                     </article>
