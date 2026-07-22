@@ -79,6 +79,14 @@ const slideshowPreloadCache = new Map();
 // Variables para eliminación de multimedia
 let isDeleteMode = false;
 let selectedMediaIndices = [];
+function createVideoThumbnail(className) {
+    const thumbContainer = document.createElement('div');
+    thumbContainer.className = `${className} video-thumbnail`;
+    thumbContainer.setAttribute('aria-label', 'Video');
+    thumbContainer.innerHTML = '<span class="video-thumbnail-emoji">🎬</span><span class="video-thumbnail-play">▶</span>';
+    return thumbContainer;
+}
+
 function createMediaElement(url, className, useControls = false) {
     const cleanedUrl = url.replace('#video', '');
     let finalUrl = cleanedUrl;
@@ -100,28 +108,19 @@ function createMediaElement(url, className, useControls = false) {
 
     if (checkIsVideo(url)) {
         // SI ES UN VIDEO
+        if (className === 'gallery-item') {
+            return createVideoThumbnail(className);
+        }
+
         if (isDrive && fileId) {
-            if (className === 'gallery-item') {
-                const thumbContainer = document.createElement('div');
-                thumbContainer.className = className;
-                thumbContainer.style.display = 'flex';
-                thumbContainer.style.alignItems = 'center';
-                thumbContainer.style.justifyContent = 'center';
-                thumbContainer.style.backgroundColor = '#111111';
-                thumbContainer.style.color = '#ffffff';
-                thumbContainer.style.fontSize = '2.5rem';
-                thumbContainer.innerHTML = '▶'; 
-                return thumbContainer;
-            } else {
-                const iframe = document.createElement('iframe');
-                iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
-                iframe.className = className;
-                iframe.style.border = 'none';
-                iframe.style.width = '80vw';
-                iframe.style.height = '70vh';
-                iframe.setAttribute('allow', 'autoplay');
-                return iframe;
-            }
+            const iframe = document.createElement('iframe');
+            iframe.src = `https://drive.google.com/file/d/${fileId}/preview`;
+            iframe.className = className;
+            iframe.style.border = 'none';
+            iframe.style.width = '80vw';
+            iframe.style.height = '70vh';
+            iframe.setAttribute('allow', 'autoplay');
+            return iframe;
         }
 
         const video = document.createElement('video');
