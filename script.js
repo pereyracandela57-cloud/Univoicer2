@@ -1156,6 +1156,38 @@ window.onload = () => {
 // --- LÓGICA DE D3.JS Y MAPA INTERACTIVO ---
 let mapNivelActual = 'mundo'; 
 let paisContexto = null;
+
+function normalizarTextoMapa(texto) {
+    return (texto || '')
+        .toString()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .trim();
+}
+
+function aventuraPlanificadaParaPais(nombrePais) {
+    const paisNormalizado = normalizarTextoMapa(nombrePais);
+    return aventurasGuardadas.some(data => {
+        const aventura = data.aventura || {};
+        return normalizarTextoMapa(aventura.pais) === paisNormalizado ||
+               normalizarTextoMapa(aventura.titulo) === paisNormalizado;
+    });
+}
+
+function aventuraPlanificadaParaCiudad(nombrePais, nombreCiudad) {
+    const paisNormalizado = normalizarTextoMapa(nombrePais);
+    const ciudadNormalizada = normalizarTextoMapa(nombreCiudad);
+    return aventurasGuardadas.some(data => {
+        const aventura = data.aventura || {};
+        const coincidePais = !aventura.pais || normalizarTextoMapa(aventura.pais) === paisNormalizado;
+        return coincidePais && (
+            normalizarTextoMapa(aventura.ciudad) === ciudadNormalizada ||
+            normalizarTextoMapa(aventura.titulo) === ciudadNormalizada
+        );
+    });
+}
+
 let regionContexto = null;
 let currentGeoJsonMundo = null;
 
@@ -1208,8 +1240,10 @@ function renderizarMundo() {
             let className = "pais";
             // Aquí puedes conectar con dataVisitados
             const nombre = d.properties.name;
-            const visitado = dataVisitados.some(p => p.nombre.toLowerCase() === nombre.toLowerCase());
+            const visitado = dataVisitados.some(p => normalizarTextoMapa(p.nombre) === normalizarTextoMapa(nombre));
+            const planificado = aventuraPlanificadaParaPais(nombre);
             if (visitado) className += " visitado";
+            if (planificado) className += " planificado sonado";
             return className;
         })
         .on("mouseover", mostrarTooltip)
@@ -1396,11 +1430,16 @@ function renderizarProvincias(geoJsonProvincias, featurePais) {
         .attr("class", d => {
             const nombreProv = d.properties.NAME_1 || d.properties.name;
             if (paisContexto && nombreProv) {
-                const paisEncontrado = dataVisitados.find(p => p.nombre.toLowerCase() === paisContexto.properties.name.toLowerCase());
+                const paisEncontrado = dataVisitados.find(p => normalizarTextoMapa(p.nombre) === normalizarTextoMapa(paisContexto.properties.name));
+                const clases = ["provincia"];
                 if (paisEncontrado) {
-                    const visitada = paisEncontrado.ciudades.some(c => c.nombre.toLowerCase() === nombreProv.toLowerCase());
-                    if (visitada) return "provincia visitado";
+                    const visitada = paisEncontrado.ciudades.some(c => normalizarTextoMapa(c.nombre) === normalizarTextoMapa(nombreProv));
+                    if (visitada) clases.push("visitado");
                 }
+                if (aventuraPlanificadaParaCiudad(paisContexto.properties.name, nombreProv)) {
+                    clases.push("planificada", "sonada");
+                }
+                return clases.join(" ");
             }
             return "provincia";
         })

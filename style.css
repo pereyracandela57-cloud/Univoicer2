@@ -641,7 +641,7 @@ body:has(#screen-mapa.active) {
 }
 
 .pais:hover {
-    fill: #ffe66d; 
+    fill: #6fbf73;
     cursor: pointer;
     filter: none;
 }
@@ -652,7 +652,7 @@ body:has(#screen-mapa.active) {
     stroke-width: 2.5px; 
 }
 .pais.visitado:hover {
-    fill: #ff747f !important;
+    fill: #6fbf73 !important;
     stroke: #2f3e46;
 }
 
@@ -663,8 +663,8 @@ body:has(#screen-mapa.active) {
     transition: all 0.25s ease;
 }
 
-.provincia:hover { 
-    fill: #ffe66d; 
+.provincia:hover {
+    fill: #6fbf73;
     cursor: pointer; 
     filter: none;
 }
@@ -674,15 +674,20 @@ body:has(#screen-mapa.active) {
     stroke: #2f3e46;
 }
 
-/* Modificadores de estado (sueños/futuro) */
-.pais.sonado, .provincia.sonada { 
-    fill: #ffd3b6 !important; 
-    stroke: #2f3e46; 
+/* Modificadores de estado (sueños/futuro): aventuras planificadas */
+.pais.sonado,
+.pais.planificado,
+.provincia.sonada,
+.provincia.planificada {
+    fill: #d4af37 !important;
+    stroke: #2f3e46;
 }
 
-.pais.visitado.sonado { 
-    fill: #ffaaa5 !important; 
-    stroke: #2f3e46;
+.pais.sonado:hover,
+.pais.planificado:hover,
+.provincia.sonada:hover,
+.provincia.planificada:hover {
+    fill: #6fbf73 !important;
 }
 
 #screen-mapa {
@@ -731,15 +736,15 @@ button[onclick="volverAlMundo()"] {
 
 #tooltip {
     position: absolute; 
-    background: #ffffff; 
-    border: 4px solid var(--secondary);
+    background: #ffffff;
+    border: 4px solid #7dd3fc;
     padding: 10px 20px; 
     border-radius: 30px; 
-    color: var(--secondary); 
+    color: #0284c7; 
     pointer-events: none;
     font-weight: 800; 
     font-size: 1.1rem; 
-    box-shadow: 0 0 20px rgba(255, 0, 127, 0.3); 
+    box-shadow: 0 0 20px rgba(125, 211, 252, 0.35); 
     z-index: 2000;
     transform: translate(-50%, -130%); 
     transition: opacity 0.2s;
@@ -749,47 +754,47 @@ button[onclick="volverAlMundo()"] {
 
 #menu-contextual {
     position: absolute; 
-    background: #059100; 
-    border: 4px solid rgba(0, 0, 0, 0.3);
+    background: rgba(3, 7, 18, 0.96);
+    border: 2px solid #00f0ff;
     border-radius: 15px; 
     padding: 18px; 
-    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2); 
+    box-shadow: 0 0 26px rgba(0, 240, 255, 0.35), 0 15px 35px rgba(0, 0, 0, 0.55);
     z-index: 1000; 
     min-width: 220px;
-    backdrop-filter: none;
+    backdrop-filter: blur(8px);
 }
 
 #menu-titulo {
     font-family: 'Rajdhani', sans-serif !important;
     color: #ffffff !important;
-    text-shadow: none;
+    text-shadow: 0 0 10px rgba(0, 240, 255, 0.75);
     font-size: 1.2rem;
     text-transform: none;
     letter-spacing: normal;
 }
 
 #menu-contextual div[style*="border-bottom"] {
-    border-bottom: 2px solid #F8BBD0 !important;
+    border-bottom: 2px solid rgba(0, 240, 255, 0.85) !important;
 }
 
 .menu-item {
     padding: 10px; 
-    background: #ffffff; 
+    background: rgba(15, 23, 42, 0.92);
     border-radius: 8px; 
     cursor: pointer;
     font-weight: 600; 
     font-family: 'Baloo 2', 'Rajdhani', sans-serif !important; 
     transition: 0.2s;
-    color: #000; 
+    color: #e2e8f0;
     font-size: 1.1rem;
-    border: none;
+    border: 1px solid rgba(0, 240, 255, 0.35);
 }
 
 .menu-item:hover {
-    background: var(--primary); 
-    color: #000;
-    box-shadow: none;
-    transform: none;
+    background: rgba(0, 240, 255, 0.16);
+    color: #ffffff;
+    box-shadow: 0 0 16px rgba(0, 240, 255, 0.35);
+    transform: translateY(-1px);
 }
 .celda-calendario {
     border: 1px solid #e0e0e0;
