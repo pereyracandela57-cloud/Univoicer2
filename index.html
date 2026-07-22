@@ -229,6 +229,16 @@
         </div>
     </div>
 
+    <div id="slideshow" class="slideshow" aria-hidden="true">
+        <button class="slideshow-close" type="button" onclick="stopSlideshow()" aria-label="Cerrar presentación">×</button>
+        <div id="slideshow-media-container"></div>
+        <div class="slideshow-controls">
+            <button class="btn btn-secondary" type="button" onclick="prevSlide()">◀ Anterior</button>
+            <button class="btn btn-danger" type="button" onclick="stopSlideshow()">Cerrar</button>
+            <button class="btn btn-secondary" type="button" onclick="nextSlide()">Siguiente ▶</button>
+        </div>
+    </div>
+
     <script src="script.js"></script>
     
 </body>
