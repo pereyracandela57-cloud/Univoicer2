@@ -70,7 +70,11 @@ function toggleMusic() {
 
 // Variables para el control del PLAY (Slideshow)
 let slideshowTimer = null;
-let slideshowIndex = 0;const SLIDE_DURATION = 5000; // Cambiado a 5 segundos para las imágenes
+let slideshowVideo = null;
+let slideshowIndex = 0;
+const SLIDE_DURATION = 5000;
+const PRELOAD_AHEAD_COUNT = 3;
+const slideshowPreloadCache = new Map();
 
 // Variables para eliminación de multimedia
 let isDeleteMode = false;
@@ -580,87 +584,159 @@ function startSlideshow() {
         return alert("No hay elementos multimedia en este recuerdo para reproducir.");
     }
     slideshowIndex = 0;
-    document.getElementById('slideshow').classList.add('active');
+    const slideshow = document.getElementById('slideshow');
+    slideshow.classList.add('active');
+    slideshow.setAttribute('aria-hidden', 'false');
+    preloadUpcomingImages();
     renderSlide();
 }
 
+function getDisplayUrl(url) {
+    const cleanedUrl = url.replace('#video', '');
+    const isDrive = cleanedUrl.includes('drive.google.com') || cleanedUrl.includes('docs.google.com');
+
+    if (!isDrive) return cleanedUrl;
+
+    const match = cleanedUrl.match(/\/d\/([^/]+)/);
+    let fileId = match && match[1] ? match[1] : null;
+
+    if (!fileId && cleanedUrl.includes('?')) {
+        fileId = new URLSearchParams(cleanedUrl.substring(cleanedUrl.indexOf('?'))).get('id');
+    }
+
+    if (!fileId) return cleanedUrl;
+
+    return checkIsVideo(url)
+        ? `https://drive.google.com/file/d/${fileId}/preview`
+        : `https://lh3.googleusercontent.com/d/${fileId}`;
+}
+
+function preloadUpcomingImages() {
+    if (!currentMediaList.length) return;
+
+    for (let offset = 1; offset <= PRELOAD_AHEAD_COUNT; offset++) {
+        const index = (slideshowIndex + offset) % currentMediaList.length;
+        const url = currentMediaList[index];
+
+        if (checkIsVideo(url) || slideshowPreloadCache.has(url)) continue;
+
+        const img = new Image();
+        img.src = getDisplayUrl(url);
+        slideshowPreloadCache.set(url, img);
+    }
+}
+
+function clearSlideshowTimer() {
+    if (slideshowTimer) {
+        clearTimeout(slideshowTimer);
+        slideshowTimer = null;
+    }
+}
+
 function renderSlide() {
-    // Limpiamos cualquier temporizador activo previo para evitar saltos dobles
-    if (slideshowTimer) clearTimeout(slideshowTimer);
+    clearSlideshowTimer();
+    if (slideshowVideo) {
+        slideshowVideo.onended = null;
+        slideshowVideo.pause?.();
+        slideshowVideo = null;
+    }
 
     const container = document.getElementById('slideshow-media-container');
     container.innerHTML = '';
-    
+
     const currentUrl = currentMediaList[slideshowIndex];
-    const isVideo = checkIsVideo(currentUrl);
 
-    // Creamos el elemento multimedia (sin silenciar y con controles habilitados por si quieren pausar)
-    // Creamos el elemento multimedia (sin silenciar y con controles habilitados por si quieren pausar)
-    const mediaEl = createMediaElement(currentUrl, '', true);
-    container.appendChild(mediaEl);
+    if (checkIsVideo(currentUrl)) {
+        renderVideoSlide(container, currentUrl);
+        return;
+    }
 
-    if (isVideo) {
-        // Si la música está sonando, la pausamos y guardamos el estado
-        if (isMusicPlaying) {
-            wasMusicPlayingBeforeVideo = true;
-            ytPlayer.pauseVideo();
+    container.appendChild(createMediaElement(currentUrl, 'slideshow-media', false));
+    preloadUpcomingImages();
+    slideshowTimer = setTimeout(nextSlide, SLIDE_DURATION);
+}
+
+function renderVideoSlide(container, currentUrl) {
+    const videoWrapper = document.createElement('div');
+    videoWrapper.className = 'slideshow-video-wrapper';
+
+    const mediaEl = createMediaElement(currentUrl, 'slideshow-media', true);
+    videoWrapper.appendChild(mediaEl);
+
+    const playButton = document.createElement('button');
+    playButton.className = 'slideshow-video-play';
+    playButton.type = 'button';
+    playButton.textContent = '▶';
+    playButton.setAttribute('aria-label', 'Reproducir video');
+    videoWrapper.appendChild(playButton);
+
+    container.appendChild(videoWrapper);
+    pauseMusicForSlideshowVideo();
+    slideshowTimer = setTimeout(nextSlide, SLIDE_DURATION);
+
+    playButton.addEventListener('click', () => {
+        clearSlideshowTimer();
+        playButton.remove();
+
+        if (mediaEl.tagName === 'VIDEO') {
+            slideshowVideo = mediaEl;
+            mediaEl.muted = false;
+            mediaEl.controls = true;
+            mediaEl.play().catch(err => console.log('No se pudo reproducir el video:', err));
+            mediaEl.onended = nextSlide;
         } else {
-            wasMusicPlayingBeforeVideo = false;
+            slideshowTimer = setTimeout(nextSlide, 30000);
         }
+    });
+}
 
-        // Le quitamos el silencio por defecto y forzamos la reproducción automática
-        mediaEl.muted = false;
-        mediaEl.autoplay = true;
-        
-        // Ejecutamos el play automáticamente dándole tiempo al navegador a cargarlo
-        setTimeout(() => {
-            mediaEl.play().catch(err => console.log("Autoplay bloqueado por el navegador:", err));
-        }, 50);
-
-        // EVENTO CLAVE: Cuando el video termine por completo, pasa a la siguiente diapositiva
-        mediaEl.onended = function() {
-            if (wasMusicPlayingBeforeVideo && ytPlayer) {
-                ytPlayer.playVideo();
-            }
-            nextSlide();
-        };
-
-        // Respaldo de seguridad: Si el video falla en cargar por conexión, pasa tras 30 segundos
-        slideshowTimer = setTimeout(nextSlide, 30000); 
+function pauseMusicForSlideshowVideo() {
+    if (isMusicPlaying && ytPlayer) {
+        wasMusicPlayingBeforeVideo = true;
+        ytPlayer.pauseVideo();
     } else {
-        // Si es una imagen, espera exactamente los 5 segundos configurados
-        slideshowTimer = setTimeout(nextSlide, SLIDE_DURATION);
+        wasMusicPlayingBeforeVideo = false;
     }
 }
 
 function nextSlide() {
+    restoreMusicAfterSlideshowVideo();
     slideshowIndex++;
     if (slideshowIndex >= currentMediaList.length) {
-        slideshowIndex = 0; // Reinicia al llegar al final
+        slideshowIndex = 0;
     }
     renderSlide();
 }
 
 function prevSlide() {
+    restoreMusicAfterSlideshowVideo();
     slideshowIndex--;
     if (slideshowIndex < 0) {
-        slideshowIndex = currentMediaList.length - 1; // Va al último si retrocede en el primero
+        slideshowIndex = currentMediaList.length - 1;
     }
     renderSlide();
 }
 
-function stopSlideshow() {
-    if (slideshowTimer) clearTimeout(slideshowTimer);
-    document.getElementById('slideshow').classList.remove('active');
-    
-    // Vaciamos el contenedor para cortar inmediatamente el audio de cualquier video en reproducción
-    document.getElementById('slideshow-media-container').innerHTML = '';
-
-    // Restaurar la música si fue pausada por un video de la presentación
+function restoreMusicAfterSlideshowVideo() {
     if (wasMusicPlayingBeforeVideo && ytPlayer) {
         ytPlayer.playVideo();
         wasMusicPlayingBeforeVideo = false;
     }
+}
+
+function stopSlideshow() {
+    clearSlideshowTimer();
+    if (slideshowVideo) {
+        slideshowVideo.pause?.();
+        slideshowVideo = null;
+    }
+
+    const slideshow = document.getElementById('slideshow');
+    slideshow.classList.remove('active');
+    slideshow.setAttribute('aria-hidden', 'true');
+    document.getElementById('slideshow-media-container').innerHTML = '';
+    slideshowPreloadCache.clear();
+    restoreMusicAfterSlideshowVideo();
 }
 let semanaActual = 0;
 const MAX_SEMANAS = 5;
