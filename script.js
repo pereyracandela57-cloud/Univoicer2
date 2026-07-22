@@ -72,6 +72,9 @@ function toggleMusic() {
 let slideshowTimer = null;
 let slideshowVideo = null;
 let slideshowIndex = 0;
+let currentMediaList = [];
+let slideshowMediaList = [];
+let imagesOnlySlideshow = false;
 const SLIDE_DURATION = 5000;
 const PRELOAD_AHEAD_COUNT = 3;
 const slideshowPreloadCache = new Map();
@@ -358,10 +361,13 @@ function resetView(title, showBack, showPlay) {
     document.getElementById('view-title').innerText = title;
     document.getElementById('btn-back').style.display = showBack ? 'block' : 'none';
     document.getElementById('btn-play').style.display = showPlay ? 'block' : 'none';
-    
+    const btnImagesOnly = document.getElementById('btn-images-only');
+    if (btnImagesOnly) btnImagesOnly.style.display = showPlay ? 'block' : 'none';
+
     // Esconder siempre el botón de música al cambiar de vista
     const btnMusic = document.getElementById('btn-music');
     if (btnMusic) btnMusic.style.display = 'none';
+    updateImagesOnlyButton();
     
     // Detener música al salir del álbum
     if (!showPlay && ytPlayer && isMusicPlaying) {
@@ -578,10 +584,37 @@ function closeLightbox() {
     document.getElementById('lightbox-media-container').innerHTML = '';
 }
 
+function toggleImagesOnlySlideshow() {
+    imagesOnlySlideshow = !imagesOnlySlideshow;
+    updateImagesOnlyButton();
+}
+
+function updateImagesOnlyButton() {
+    const btnImagesOnly = document.getElementById('btn-images-only');
+    if (!btnImagesOnly) return;
+
+    btnImagesOnly.innerHTML = imagesOnlySlideshow
+        ? '🖼️ SOLO IMÁGENES: SÍ'
+        : '🖼️ SOLO IMÁGENES: NO';
+    btnImagesOnly.setAttribute('aria-pressed', imagesOnlySlideshow.toString());
+    btnImagesOnly.classList.toggle('active', imagesOnlySlideshow);
+}
+
+function getSlideshowMediaList() {
+    if (!imagesOnlySlideshow) return [...currentMediaList];
+    return currentMediaList.filter(url => !checkIsVideo(url));
+}
+
 function startSlideshow() {
-    if (currentMediaList.length === 0) {
-        return alert("No hay elementos multimedia en este recuerdo para reproducir.");
+    slideshowMediaList = getSlideshowMediaList();
+
+    if (slideshowMediaList.length === 0) {
+        const message = imagesOnlySlideshow
+            ? "No hay imágenes en este recuerdo para reproducir. Desactiva 'Solo imágenes' para ver los videos."
+            : "No hay elementos multimedia en este recuerdo para reproducir.";
+        return alert(message);
     }
+
     slideshowIndex = 0;
     const slideshow = document.getElementById('slideshow');
     slideshow.classList.add('active');
@@ -611,11 +644,11 @@ function getDisplayUrl(url) {
 }
 
 function preloadUpcomingImages() {
-    if (!currentMediaList.length) return;
+    if (!slideshowMediaList.length) return;
 
     for (let offset = 1; offset <= PRELOAD_AHEAD_COUNT; offset++) {
-        const index = (slideshowIndex + offset) % currentMediaList.length;
-        const url = currentMediaList[index];
+        const index = (slideshowIndex + offset) % slideshowMediaList.length;
+        const url = slideshowMediaList[index];
 
         if (checkIsVideo(url) || slideshowPreloadCache.has(url)) continue;
 
@@ -643,7 +676,7 @@ function renderSlide() {
     const container = document.getElementById('slideshow-media-container');
     container.innerHTML = '';
 
-    const currentUrl = currentMediaList[slideshowIndex];
+    const currentUrl = slideshowMediaList[slideshowIndex];
 
     if (checkIsVideo(currentUrl)) {
         renderVideoSlide(container, currentUrl);
@@ -701,7 +734,7 @@ function pauseMusicForSlideshowVideo() {
 function nextSlide() {
     restoreMusicAfterSlideshowVideo();
     slideshowIndex++;
-    if (slideshowIndex >= currentMediaList.length) {
+    if (slideshowIndex >= slideshowMediaList.length) {
         slideshowIndex = 0;
     }
     renderSlide();
@@ -711,7 +744,7 @@ function prevSlide() {
     restoreMusicAfterSlideshowVideo();
     slideshowIndex--;
     if (slideshowIndex < 0) {
-        slideshowIndex = currentMediaList.length - 1;
+        slideshowIndex = slideshowMediaList.length - 1;
     }
     renderSlide();
 }
@@ -735,6 +768,7 @@ function stopSlideshow() {
     slideshow.setAttribute('aria-hidden', 'true');
     document.getElementById('slideshow-media-container').innerHTML = '';
     slideshowPreloadCache.clear();
+    slideshowMediaList = [];
     restoreMusicAfterSlideshowVideo();
 }
 let semanaActual = 0;

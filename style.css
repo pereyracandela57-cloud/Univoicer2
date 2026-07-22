@@ -233,6 +233,19 @@ main {
     color: var(--accent);
 }
 
+.btn-toggle-media {
+    border-color: var(--primary);
+    background: rgba(0, 240, 255, 0.1);
+    color: var(--primary);
+}
+
+.btn-toggle-media.active {
+    border-color: var(--secondary);
+    background: rgba(255, 0, 127, 0.14);
+    color: var(--secondary);
+    box-shadow: 0 0 15px rgba(255, 0, 127, 0.35), inset 0 0 10px rgba(255, 0, 127, 0.18);
+}
+
 .grid-container {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
