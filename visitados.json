@@ -19,6 +19,15 @@
           }]
       },
       {
+        "nombre": "Rio Negro",
+        "portada": "portadas/rionegro.jpg",
+        "albumes": [ {
+            "id": "bariloche",
+            "nombre": "Bariloche",
+            "portada": "portadas/bariloche.jpg"
+          }]
+      },
+      {
         "nombre": "Mendoza",
         "portada": "portadas/mendoza.jpg",
         "albumes": []
